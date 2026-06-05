@@ -77,7 +77,8 @@ public sealed class OpeningTool : DrawToolBase
         var wallWorld = new Transform3D(wall.LocalTransform.Basis, wall.LocalTransform.Origin + Ctx.ElevationOffset);
         Vector3 local = wallWorld.AffineInverse() * hit.Position;
 
-        if (!OpeningPlacement.TrySnapOffset(wall, local.X, _preset.Width, null, out float offset)) { wall = null; return false; }
+        if (!OpeningPlacement.SnapOffset(wall, local.X, _preset.Width, out float offset)) { wall = null; return false; }
+        if (OpeningPlacement.Overlaps(wall, offset, _preset.Width, _preset.Sill, _preset.Height, null)) { wall = null; return false; }
 
         opening = new OpeningData
         {

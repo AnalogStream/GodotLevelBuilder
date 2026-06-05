@@ -14,12 +14,11 @@ public static class OpeningPlacement
 
     /// <summary>
     /// Snap+clamp a desired along-wall centre (<paramref name="localX"/>, wall-local) to a valid
-    /// <paramref name="offset"/> for an opening of <paramref name="width"/>. False if the wall is
-    /// too short or the result overlaps another opening — the one with
-    /// <paramref name="ignoreOpeningId"/> (if any) is excluded, so a dragged opening ignores itself.
+    /// <paramref name="offset"/> for an opening of <paramref name="width"/>. False only if the wall
+    /// is too short — overlap is a separate 2D check (see <see cref="Overlaps"/>) so callers can fold
+    /// in the vertical position too.
     /// </summary>
-    public static bool TrySnapOffset(
-        PrimitiveInstanceData wall, float localX, float width, string ignoreOpeningId, out float offset)
+    public static bool SnapOffset(PrimitiveInstanceData wall, float localX, float width, out float offset)
     {
         float length = GetF(wall, "length", 1f);
         float centerU = localX + length * 0.5f;
@@ -29,19 +28,25 @@ public static class OpeningPlacement
         float maxOffset = length - width - Margin;
         if (maxOffset < Margin) return false; // wall too short for this opening
         offset = Mathf.Clamp(offset, Margin, maxOffset);
-
-        return !Overlaps(wall, offset, width, ignoreOpeningId);
+        return true;
     }
 
-    /// <summary>True if [offset, offset+width] (padded by Margin) hits another opening on the wall.</summary>
-    public static bool Overlaps(PrimitiveInstanceData wall, float offset, float width, string ignoreOpeningId)
+    /// <summary>
+    /// True if the rectangle [offset, offset+width] × [sill, sill+height] (padded by Margin on all
+    /// sides) hits another opening on the wall. The 2D test lets openings stack vertically — two are
+    /// only in conflict when they overlap both along the wall AND in height. The one with
+    /// <paramref name="ignoreOpeningId"/> (if any) is excluded, so a dragged opening ignores itself.
+    /// </summary>
+    public static bool Overlaps(PrimitiveInstanceData wall, float offset, float width, float sill, float height, string ignoreOpeningId)
     {
-        float start = offset, end = offset + width;
+        float aL = offset - Margin, aR = offset + width + Margin;
+        float aB = sill - Margin, aT = sill + height + Margin;
         foreach (OpeningData ex in wall.Openings)
         {
             if (ignoreOpeningId != null && ex.Id == ignoreOpeningId) continue;
-            float exStart = ex.Offset - Margin, exEnd = ex.Offset + ex.Width + Margin;
-            if (start < exEnd && end > exStart) return true;
+            float bL = ex.Offset, bR = ex.Offset + ex.Width;
+            float bB = ex.SillHeight, bT = ex.SillHeight + ex.Height;
+            if (aL < bR && aR > bL && aB < bT && aT > bB) return true;
         }
         return false;
     }

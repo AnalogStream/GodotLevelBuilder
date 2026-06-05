@@ -7,11 +7,12 @@ namespace LevelBuilder.Core.Primitives;
 
 /// <summary>
 /// A straight wall segment with optional door/window openings. Built by box-decomposition
-/// (docs/PRIMITIVES.md): the wall along its length splits into solid sub-boxes — full-height
-/// segments between openings, plus a sill block below and header block above each opening —
-/// and the four inner faces of every opening (jambs, sill top, header underside) are emitted
-/// as reveal quads. No CSG, no polygon-with-hole; holes show in the mesh and the trimesh
-/// collision alike.
+/// (docs/PRIMITIVES.md): the wall's front/back faces are swept in two passes — split into vertical
+/// strips at every opening edge, then within each strip the solid y-bands (between the openings
+/// that cover it) are emitted as quads. This handles openings side by side AND stacked vertically
+/// (a window above a door, two windows…). The four inner faces of every opening (jambs, sill top,
+/// header underside) are emitted as reveal quads. No CSG, no polygon-with-hole; holes show in the
+/// mesh and the trimesh collision alike.
 ///
 /// Local space: centred on origin, running along X (length), thickness along Z, rising y=0..H.
 /// Surfaces: 0 Front (+Z), 1 Back (−Z), 2 Top (+Y), 3 Ends (bottom + X caps), 4 Reveal.
@@ -74,16 +75,34 @@ public sealed class WallPrimitive : IPrimitive
 
         List<OpeningBox> openings = CollectValid(data.Openings, l, h);
 
-        float cursor = 0f;
-        foreach (OpeningBox o in openings)
+        // Sweep the front/back faces in vertical strips bounded by every opening edge. Within each
+        // strip, the openings that cover it stack up the height; emit the solid bands in the gaps.
+        var bounds = new SortedSet<float> { 0f, l };
+        foreach (OpeningBox o in openings) { bounds.Add(o.Offset); bounds.Add(o.Offset + o.Width); }
+        var us = new List<float>(bounds);
+
+        for (int i = 0; i + 1 < us.Count; i++)
         {
-            if (o.Offset > cursor + Eps) { FrontBack(cursor, o.Offset, 0, h); TopStrip(cursor, o.Offset); BottomStrip(cursor, o.Offset); }
-            if (o.Sill > Eps) { FrontBack(o.Offset, o.Offset + o.Width, 0, o.Sill); BottomStrip(o.Offset, o.Offset + o.Width); }
-            if (o.Top < h - Eps) { FrontBack(o.Offset, o.Offset + o.Width, o.Top, h); TopStrip(o.Offset, o.Offset + o.Width); }
-            Reveals(o);
-            cursor = o.Offset + o.Width;
+            float ua = us[i], ub = us[i + 1];
+            if (ub - ua < Eps) continue;
+            float mid = (ua + ub) * 0.5f;
+
+            List<OpeningBox> inStrip = openings.FindAll(o => o.Offset <= mid && mid <= o.Offset + o.Width);
+            inStrip.Sort((a, b) => a.Sill.CompareTo(b.Sill));
+
+            float y = 0f;
+            foreach (OpeningBox o in inStrip)
+            {
+                if (o.Sill > y + Eps) FrontBack(ua, ub, y, o.Sill);
+                y = Mathf.Max(y, o.Top);
+            }
+            if (y < h - Eps) FrontBack(ua, ub, y, h);
+
+            if (inStrip.Count == 0 || inStrip[0].Sill > Eps) BottomStrip(ua, ub); // floor face, unless an opening reaches it
+            if (y < h - Eps) TopStrip(ua, ub);                                    // ceiling face, unless an opening reaches it
         }
-        if (cursor < l - Eps) { FrontBack(cursor, l, 0, h); TopStrip(cursor, l); BottomStrip(cursor, l); }
+
+        foreach (OpeningBox o in openings) Reveals(o);
 
         // End caps at u = 0 (−X) and u = L (+X)
         float xMin = X(0f), xMax = X(l);
@@ -102,10 +121,13 @@ public sealed class WallPrimitive : IPrimitive
     public Shape3D[] BuildCollision(PrimitiveInstanceData data, BuildContext ctx)
         => new Shape3D[] { BuildMesh(data, ctx).CreateTrimeshShape() };
 
-    /// <summary>Clamp/sort openings to interior, non-overlapping, non-degenerate boxes.</summary>
+    /// <summary>
+    /// Interior, non-degenerate opening boxes, dropping any that overlap an earlier one in 2D
+    /// (so vertically-stacked openings are kept — only true rectangle overlaps are rejected).
+    /// </summary>
     private static List<OpeningBox> CollectValid(Godot.Collections.Array<OpeningData> raw, float l, float h)
     {
-        var boxes = new List<OpeningBox>();
+        var result = new List<OpeningBox>();
         foreach (OpeningData o in raw)
         {
             float width = o.Width;
@@ -114,20 +136,19 @@ public sealed class WallPrimitive : IPrimitive
             float sill = Mathf.Max(0f, o.SillHeight);
             float topY = Mathf.Min(sill + o.Height, h);
             if (topY <= sill + Eps) continue;
-            boxes.Add(new OpeningBox { Offset = offset, Width = width, Sill = sill, Top = topY });
-        }
-        boxes.Sort((a, b) => a.Offset.CompareTo(b.Offset));
 
-        // Drop any that overlap an earlier one.
-        var result = new List<OpeningBox>();
-        float cursor = 0f;
-        foreach (OpeningBox o in boxes)
-        {
-            if (o.Offset < cursor - Eps) continue;
-            result.Add(o);
-            cursor = o.Offset + o.Width;
+            var box = new OpeningBox { Offset = offset, Width = width, Sill = sill, Top = topY };
+            if (!OverlapsAny(box, result)) result.Add(box);
         }
         return result;
+    }
+
+    private static bool OverlapsAny(OpeningBox b, List<OpeningBox> existing)
+    {
+        foreach (OpeningBox e in existing)
+            if (b.Offset < e.Offset + e.Width && b.Offset + b.Width > e.Offset &&
+                b.Sill < e.Top && b.Top > e.Sill) return true;
+        return false;
     }
 
     private struct OpeningBox

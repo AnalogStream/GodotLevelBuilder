@@ -59,7 +59,7 @@ elevation view of a wall with one window opening:
 - **HEADER** `[x, x+w] × [s+h, H]`.
 - **Reveals**: the four inner faces of the opening (left jamb, right jamb, sill top, header bottom) are quads on their own material slot (`Reveal`).
 
-**Multiple openings:** sort by offset, emit alternating RIGHT/LEFT boundary slabs between consecutive openings — i.e. the wall becomes a sequence of vertical solid slabs separated by openings, each opening contributing its sill/header/reveals. This generalizes cleanly to N openings with no boolean ops. Collision uses the same sub-boxes (convex per box) — cheap and exact.
+**Multiple openings (incl. stacked):** the front/back faces are swept in two passes. First split the wall into **vertical strips** at every opening edge (the unique `x` and `x+w` values, plus the wall ends). Then within each strip, take the openings that cover it, sort them by sill, and emit a solid quad for each **y-band** in the gaps (below the lowest, between consecutive openings, above the highest); add the top/bottom face for that strip unless an opening reaches the ceiling/floor there. Reveals are emitted per opening. This handles openings side by side **and stacked vertically** (a window above a door, two windows…) with no boolean ops, and for non-stacked walls emits exactly the old slab geometry. Openings may not overlap in 2D (offset×height); the edit tools and `CollectValid` enforce it. Collision uses the trimesh of the same geometry — cheap and exact.
 
 > Never reach for CSG or polygon-hole triangulation here. The decomposition above is the whole feature.
 

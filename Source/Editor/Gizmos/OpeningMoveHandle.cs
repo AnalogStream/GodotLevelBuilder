@@ -48,15 +48,20 @@ public sealed class OpeningMoveHandle : IEditHandle
         Vector3 start = _wallWorld.AffineInverse() * grabStart;
         Vector3 now = _wallWorld.AffineInverse() * grabNow;
 
-        // Horizontal: move the centre by the cursor delta, snapped + clamped + overlap-rejected.
+        // Candidate position: horizontal centre (snapped + clamped) and vertical sill (snapped + clamped).
         float origCentreLocalX = _orig.Offset + _orig.Width * 0.5f - _length * 0.5f;
         float desiredCentreLocalX = origCentreLocalX + (now.X - start.X);
-        if (OpeningPlacement.TrySnapOffset(_wall, desiredCentreLocalX, _orig.Width, _opening.Id, out float offset))
-            _offset = offset;
+        float offsetCand = OpeningPlacement.SnapOffset(_wall, desiredCentreLocalX, _orig.Width, out float snapped) ? snapped : _offset;
 
-        // Vertical: shift the sill by the snapped delta, keeping the opening inside the wall.
         float dy = Mathf.Round((now.Y - start.Y) / Step) * Step;
-        _sill = Mathf.Clamp(_orig.Sill + dy, 0f, Mathf.Max(0f, _wallHeight - _orig.Height));
+        float sillCand = Mathf.Clamp(_orig.Sill + dy, 0f, Mathf.Max(0f, _wallHeight - _orig.Height));
+
+        // Apply only if the whole rectangle clears other openings (2D, so stacked neighbours are fine).
+        if (!OpeningPlacement.Overlaps(_wall, offsetCand, _orig.Width, sillCand, _orig.Height, _opening.Id))
+        {
+            _offset = offsetCand;
+            _sill = sillCand;
+        }
 
         _opening.Offset = _offset;
         _opening.SillHeight = _sill;

@@ -79,7 +79,7 @@ public sealed class OpeningResizeHandle : IEditHandle
         if (c.Offset + c.Width > _length - OpeningPlacement.Margin) return false;
         if (c.Sill < 0f) return false;
         if (c.Sill + c.Height > _wallHeight) return false;
-        return !OpeningPlacement.Overlaps(_wall, c.Offset, c.Width, _opening.Id);
+        return !OpeningPlacement.Overlaps(_wall, c.Offset, c.Width, c.Sill, c.Height, _opening.Id);
     }
 
     public void Cancel()
