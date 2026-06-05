@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using LevelBuilder.Core;
 using LevelBuilder.Core.Build;
 using LevelBuilder.Core.Data;
 using LevelBuilder.Core.Primitives;
@@ -18,11 +19,13 @@ namespace LevelBuilder.Editor.Session;
 public sealed class EditorContext
 {
     public LevelDocument Document { get; init; }
-    public StoreyData Storey { get; init; }
+    /// <summary>The storey currently being edited; new geometry goes here. Switch with <see cref="StoreyUp"/>/<see cref="StoreyDown"/>.</summary>
+    public StoreyData Storey { get; private set; }
     public PrimitiveRegistry Registry { get; init; }
     public CommandStack Commands { get; init; }
     public LevelView View { get; init; }
     public GridCursor Cursor { get; init; }
+    public GridRenderer Grid { get; init; }
     public Node3D PreviewLayer { get; init; }
     public InstancePicker Picker { get; init; }
     public GizmoLayer Gizmos { get; init; }
@@ -55,16 +58,80 @@ public sealed class EditorContext
         if (SelectedOpeningId != null)
         {
             (PrimitiveInstanceData wall, OpeningData opening) = FindOpening(SelectedId, SelectedOpeningId);
-            return OpeningHandleProvider.Build(wall, opening, ElevationOffset);
+            return OpeningHandleProvider.Build(wall, opening, OffsetOfInstance(SelectedId));
         }
         if (SelectedId == null) return new List<IEditHandle>();
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
-        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), ElevationOffset);
+        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId));
     }
 
-    /// <summary>World-space offset of the active storey's floor plane.</summary>
+    /// <summary>World offset of the ACTIVE storey's floor plane (where new geometry is drawn).</summary>
     public Vector3 ElevationOffset => new(0, Storey.BaseElevation, 0);
+
+    /// <summary>World offset of the storey that OWNS <paramref name="id"/> — not necessarily the active one.</summary>
+    public Vector3 OffsetOfInstance(string id)
+    {
+        (StoreyData s, _, _) = Find(id);
+        return new Vector3(0, (s ?? Storey).BaseElevation, 0);
+    }
+
+    /// <summary>Offset of the storey owning the current selection, so handles/drags sit on the right level.</summary>
+    public Vector3 SelectedInstanceOffset => OffsetOfInstance(SelectedId);
+
+    // ---- storeys ---------------------------------------------------------
+
+    /// <summary>Moves up one storey, creating a new one stacked on top at the frontier.</summary>
+    public void StoreyUp() => SwitchStorey(+1);
+    /// <summary>Moves down one storey, creating a new one stacked below at the frontier.</summary>
+    public void StoreyDown() => SwitchStorey(-1);
+
+    /// <summary>
+    /// Makes <paramref name="s"/> the active storey: the grid and snap cursor jump to its elevation and
+    /// any selection (possibly on another storey) is cleared. Also the single entry point used at startup.
+    /// </summary>
+    public void SetActiveStorey(StoreyData s)
+    {
+        Storey = s;
+        Cursor.Elevation = s.BaseElevation;
+        if (Grid != null) Grid.Position = new Vector3(0, s.BaseElevation, 0);
+        GD.Print($"[storey] active: {s.Name}  (base {s.BaseElevation:0.##} m, height {s.Height:0.##} m)");
+        ClearSelection(); // drop a selection from another storey; refreshes view + gizmos if needed
+    }
+
+    private void SwitchStorey(int dir)
+    {
+        List<StoreyData> sorted = SortedStoreys();
+        int idx = sorted.IndexOf(Storey);
+        StoreyData target = dir > 0
+            ? (idx + 1 < sorted.Count ? sorted[idx + 1] : CreateStacked(sorted[^1], +1))
+            : (idx - 1 >= 0 ? sorted[idx - 1] : CreateStacked(sorted[0], -1));
+        SetActiveStorey(target);
+    }
+
+    private List<StoreyData> SortedStoreys()
+    {
+        var list = new List<StoreyData>();
+        foreach (StoreyData s in Document.Storeys) list.Add(s);
+        list.Sort((a, b) => a.BaseElevation.CompareTo(b.BaseElevation));
+        return list;
+    }
+
+    /// <summary>New storey flush above (dir=+1) or below (dir=-1) <paramref name="from"/>, inheriting its height.</summary>
+    private StoreyData CreateStacked(StoreyData from, int dir)
+    {
+        float height = from.Height;
+        float baseElev = dir > 0 ? from.BaseElevation + from.Height : from.BaseElevation - height;
+        var s = new StoreyData
+        {
+            Id = Ids.New(),
+            Name = $"Storey {baseElev:0.##} m",
+            BaseElevation = baseElev,
+            Height = height,
+        };
+        Document.Storeys.Add(s);
+        return s;
+    }
 
     public BuildContext BuildCtx() => new()
     {

@@ -52,15 +52,16 @@ public partial class Main : Node3D
         var ctx = new EditorContext
         {
             Document = doc,
-            Storey = storey,
             Registry = registry,
             Commands = new CommandStack(),
             View = levelView,
             Cursor = cursor,
+            Grid = grid,
             PreviewLayer = previewLayer,
             Picker = picker,
             Gizmos = gizmos,
         };
+        ctx.SetActiveStorey(storey); // unified path: positions grid + cursor at the storey's elevation
         tools.Setup(ctx);
     }
 

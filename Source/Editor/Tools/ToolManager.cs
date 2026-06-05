@@ -27,7 +27,7 @@ public partial class ToolManager : Node
             { Key.D, new OpeningTool(OpeningPreset.Door) },
             { Key.N, new OpeningTool(OpeningPreset.Window) },
         };
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, D = Door, N = wiNdow, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     public override void _UnhandledInput(InputEvent e)
@@ -69,6 +69,11 @@ public partial class ToolManager : Node
 
         if (k.Keycode == Key.Escape) { _active?.OnCancel(); return; }
         if (k.Keycode == Key.Delete) { _ctx.DeleteSelected(); return; }
+
+        // Storey navigation: + up / − down (main-row "+" is Shift+Equal → still reports as Equal).
+        // Cancel any in-progress draw first so a half-placed primitive can't straddle two elevations.
+        if (k.Keycode is Key.Equal or Key.KpAdd) { _active?.OnCancel(); _ctx.StoreyUp(); GetViewport().SetInputAsHandled(); return; }
+        if (k.Keycode is Key.Minus or Key.KpSubtract) { _active?.OnCancel(); _ctx.StoreyDown(); GetViewport().SetInputAsHandled(); return; }
 
         if (_tools.TryGetValue(k.Keycode, out ITool tool))
         {

@@ -46,13 +46,13 @@ public sealed class SelectTool : ITool
             _ctx.SelectOpening(r.InstanceId, r.OpeningId);
             PrimitiveInstanceData wall = _ctx.GetInstance(r.InstanceId);
             OpeningData opening = FindOpening(wall, r.OpeningId);
-            if (opening != null) Begin(new OpeningMoveHandle(wall, opening, _ctx.ElevationOffset));
+            if (opening != null) Begin(new OpeningMoveHandle(wall, opening, _ctx.SelectedInstanceOffset));
         }
         else
         {
             _ctx.Select(r.InstanceId);
             PrimitiveInstanceData inst = _ctx.GetInstance(r.InstanceId);
-            if (inst != null) Begin(new InstanceMoveHandle(inst, _ctx.Document.Grid.CellSize, _ctx.ElevationOffset.Y));
+            if (inst != null) Begin(new InstanceMoveHandle(inst, _ctx.Document.Grid.CellSize, _ctx.SelectedInstanceOffset.Y));
         }
     }
 

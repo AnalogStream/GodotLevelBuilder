@@ -73,8 +73,8 @@ public sealed class OpeningTool : DrawToolBase
         float length = GetF(wall, "length", 1f);
         float thickness = GetF(wall, "thickness", 0.2f);
 
-        // World transform of the wall (storey-local + active storey elevation).
-        var wallWorld = new Transform3D(wall.LocalTransform.Basis, wall.LocalTransform.Origin + Ctx.ElevationOffset);
+        // World transform of the wall (storey-local + the wall's OWNING storey elevation).
+        var wallWorld = new Transform3D(wall.LocalTransform.Basis, wall.LocalTransform.Origin + Ctx.OffsetOfInstance(hit.InstanceId));
         Vector3 local = wallWorld.AffineInverse() * hit.Position;
 
         if (!OpeningPlacement.SnapOffset(wall, local.X, _preset.Width, out float offset)) { wall = null; return false; }
