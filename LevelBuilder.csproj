@@ -1,0 +1,16 @@
+<Project Sdk="Godot.NET.Sdk/4.6.3">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="CLAUDE.md" />
+    <Content Include="docs\ARCHITECTURE.md" />
+    <Content Include="docs\CONVENTIONS.md" />
+    <Content Include="docs\DATA_MODEL.md" />
+    <Content Include="docs\EXPORT.md" />
+    <Content Include="docs\PRIMITIVES.md" />
+    <Content Include="docs\ROADMAP.md" />
+  </ItemGroup>
+</Project>
