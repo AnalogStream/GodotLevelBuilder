@@ -54,19 +54,24 @@ public sealed class RampDrawTool : DrawToolBase
         float length = d.Length();
         if (length < MinLength) return null;
 
-        float angle = Mathf.Atan2(-d.Z, d.X); // rotate local +X onto the run direction
+        float width = Ctx.Document.Grid.CellSize; // one cell wide → edges land on grid lines
+        float angle = Mathf.Atan2(-d.Z, d.X);     // rotate local +X onto the run direction
+        var basis = new Basis(Vector3.Up, angle);
         var mid = new Vector3((a.X + b.X) * 0.5f, 0, (a.Z + b.Z) * 0.5f);
+        // Width is centred on the origin, so shift perpendicular by half-width: the drawn line becomes
+        // the ramp's near EDGE (it sits on the adjacent tiles), not its straddled centreline.
+        mid += basis.Z * (width * 0.5f);
 
         return new PrimitiveInstanceData
         {
             Id = Ids.New(),
             PrimitiveType = "ramp",
-            LocalTransform = new Transform3D(new Basis(Vector3.Up, angle), mid),
+            LocalTransform = new Transform3D(basis, mid),
             Parameters = new Dictionary
             {
                 { "length", (double)length },
                 { "rise", (double)Ctx.Storey.Height },
-                { "width", 1.2 },
+                { "width", (double)width },
             },
         };
     }

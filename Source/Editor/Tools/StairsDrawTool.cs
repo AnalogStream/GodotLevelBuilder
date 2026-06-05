@@ -59,20 +59,25 @@ public sealed class StairsDrawTool : DrawToolBase
         float rise = Ctx.Storey.Height;
         int steps = Mathf.Max(1, Mathf.RoundToInt(rise / TargetRiser));
 
-        float angle = Mathf.Atan2(-d.Z, d.X); // rotate local +X onto the run direction
+        float width = Ctx.Document.Grid.CellSize; // one cell wide → edges land on grid lines
+        float angle = Mathf.Atan2(-d.Z, d.X);     // rotate local +X onto the run direction
+        var basis = new Basis(Vector3.Up, angle);
         var mid = new Vector3((a.X + b.X) * 0.5f, 0, (a.Z + b.Z) * 0.5f);
+        // Width is centred on the origin, so shift perpendicular by half-width: the drawn line becomes
+        // the flight's near EDGE (it sits on the adjacent tiles), not its straddled centreline.
+        mid += basis.Z * (width * 0.5f);
 
         return new PrimitiveInstanceData
         {
             Id = Ids.New(),
             PrimitiveType = "stairs",
-            LocalTransform = new Transform3D(new Basis(Vector3.Up, angle), mid),
+            LocalTransform = new Transform3D(basis, mid),
             Parameters = new Dictionary
             {
                 { "steps", steps },
                 { "totalRise", (double)rise },
                 { "run", (double)run },
-                { "width", 1.2 },
+                { "width", (double)width },
             },
         };
     }
