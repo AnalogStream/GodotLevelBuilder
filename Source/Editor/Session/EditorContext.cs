@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using Godot;
 using LevelBuilder.Core.Build;
 using LevelBuilder.Core.Data;
 using LevelBuilder.Core.Primitives;
 using LevelBuilder.Editor.Commands;
+using LevelBuilder.Editor.Gizmos;
 using LevelBuilder.Editor.Grid;
 using LevelBuilder.Editor.View;
 
@@ -23,10 +25,39 @@ public sealed class EditorContext
     public GridCursor Cursor { get; init; }
     public Node3D PreviewLayer { get; init; }
     public InstancePicker Picker { get; init; }
+    public GizmoLayer Gizmos { get; init; }
 
     public string SelectedId { get; private set; }
     /// <summary>Non-null when an opening is selected; <see cref="SelectedId"/> is then its owning wall.</summary>
     public string SelectedOpeningId { get; private set; }
+
+    private IReadOnlyList<IEditHandle> _handles = new List<IEditHandle>();
+    /// <summary>Resize handles for the current selection (indexed by the picker's HandleIndex).</summary>
+    public IReadOnlyList<IEditHandle> Handles => _handles;
+
+    /// <summary>
+    /// Re-syncs everything derived from selection + document state: the view's selection, the live
+    /// mesh, and the gizmo handles. The single choke point for "the scene changed" — every command,
+    /// selection change, and live drag frame routes through here, so the handle widgets track edits
+    /// as they happen. (A live drag holds its handle in SelectTool, so rebuilding this list doesn't
+    /// disturb the in-flight drag.)
+    /// </summary>
+    public void Refresh()
+    {
+        View.SetSelection(SelectedId, SelectedOpeningId);
+        _handles = BuildHandles();
+        View.Rebuild();
+        Gizmos.Rebuild(_handles);
+    }
+
+    private List<IEditHandle> BuildHandles()
+    {
+        // Openings slide/resize is grabbed via the body for now; resize handles are instance-only.
+        if (SelectedOpeningId != null || SelectedId == null) return new List<IEditHandle>();
+        PrimitiveInstanceData inst = GetInstance(SelectedId);
+        if (inst == null) return new List<IEditHandle>();
+        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), ElevationOffset);
+    }
 
     /// <summary>World-space offset of the active storey's floor plane.</summary>
     public Vector3 ElevationOffset => new(0, Storey.BaseElevation, 0);
@@ -39,7 +70,7 @@ public sealed class EditorContext
     };
 
     public void AddInstance(PrimitiveInstanceData instance)
-        => Commands.Execute(new AddInstanceCommand(Storey, instance, View.Rebuild));
+        => Commands.Execute(new AddInstanceCommand(Storey, instance, Refresh));
 
     public void Undo() => Commands.Undo();
     public void Redo() => Commands.Redo();
@@ -62,21 +93,13 @@ public sealed class EditorContext
     }
 
     public void AddOpening(PrimitiveInstanceData wall, OpeningData opening)
-        => Commands.Execute(new AddOpeningCommand(wall, opening, View.Rebuild));
-
-    /// <summary>Commits a finished opening drag (the offset has already been moved live to <paramref name="to"/>).</summary>
-    public void MoveOpening(OpeningData opening, float from, float to)
-        => Commands.Execute(new MoveOpeningCommand(opening, from, to, View.Rebuild));
-
-    /// <summary>Commits a finished instance drag (the transform has already been moved live to <paramref name="to"/>).</summary>
-    public void MoveInstance(PrimitiveInstanceData instance, Transform3D from, Transform3D to)
-        => Commands.Execute(new MoveInstanceCommand(instance, from, to, View.Rebuild));
+        => Commands.Execute(new AddOpeningCommand(wall, opening, Refresh));
 
     public void Select(string id)
     {
         SelectedId = id;
         SelectedOpeningId = null;
-        View.SetSelected(id, null);
+        Refresh();
     }
 
     /// <summary>Selects an opening: the wall is drawn intact and the opening shows as a solid placeholder.</summary>
@@ -84,7 +107,7 @@ public sealed class EditorContext
     {
         SelectedId = wallId;
         SelectedOpeningId = openingId;
-        View.SetSelected(wallId, openingId);
+        Refresh();
     }
 
     public void ClearSelection()
@@ -92,7 +115,7 @@ public sealed class EditorContext
         if (SelectedId == null && SelectedOpeningId == null) return;
         SelectedId = null;
         SelectedOpeningId = null;
-        View.SetSelected(null, null);
+        Refresh();
     }
 
     public void DeleteSelected()
@@ -104,7 +127,7 @@ public sealed class EditorContext
 
             SelectedId = null;
             SelectedOpeningId = null; // command's refresh will rebuild without the placeholder
-            Commands.Execute(new RemoveOpeningCommand(wall, opening, View.Rebuild));
+            Commands.Execute(new RemoveOpeningCommand(wall, opening, Refresh));
             return;
         }
 
@@ -113,7 +136,7 @@ public sealed class EditorContext
         if (inst == null) { ClearSelection(); return; }
 
         SelectedId = null; // command's refresh will rebuild without the highlight
-        Commands.Execute(new RemoveInstanceCommand(storey, inst, index, View.Rebuild));
+        Commands.Execute(new RemoveInstanceCommand(storey, inst, index, Refresh));
     }
 
     private (PrimitiveInstanceData, OpeningData) FindOpening(string wallId, string openingId)

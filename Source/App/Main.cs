@@ -4,6 +4,7 @@ using LevelBuilder.Core.Data;
 using LevelBuilder.Core.Primitives;
 using LevelBuilder.Editor.Camera;
 using LevelBuilder.Editor.Commands;
+using LevelBuilder.Editor.Gizmos;
 using LevelBuilder.Editor.Grid;
 using LevelBuilder.Editor.Session;
 using LevelBuilder.Editor.Tools;
@@ -34,11 +35,13 @@ public partial class Main : Node3D
         var cursor = new GridCursor { CellSize = doc.Grid.CellSize, Elevation = storey.BaseElevation };
         var cameraRig = new EditorCameraRig();
         var picker = new InstancePicker();
+        var gizmos = new GizmoLayer { Name = "GizmoLayer" };
         var tools = new ToolManager();
 
         AddChild(grid);
         AddChild(levelView);
         AddChild(previewLayer);
+        AddChild(gizmos);
         AddChild(cursor);     // before ToolManager so HoveredCell/Corner is fresh each frame
         AddChild(cameraRig);
         AddChild(picker);
@@ -56,6 +59,7 @@ public partial class Main : Node3D
             Cursor = cursor,
             PreviewLayer = previewLayer,
             Picker = picker,
+            Gizmos = gizmos,
         };
         tools.Setup(ctx);
     }

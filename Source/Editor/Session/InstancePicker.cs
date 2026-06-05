@@ -2,13 +2,15 @@ using Godot;
 
 namespace LevelBuilder.Editor.Session;
 
-/// <summary>Outcome of a viewport pick: which instance, and where it was hit.</summary>
+/// <summary>Outcome of a viewport pick: a gizmo handle, an instance, or an opening.</summary>
 public readonly struct PickResult
 {
     public bool Hit { get; }
     public string InstanceId { get; }
     /// <summary>Set when an opening's pick box was hit; <see cref="InstanceId"/> is then its owning wall.</summary>
     public string OpeningId { get; }
+    /// <summary>Index into the current handle list when a gizmo handle was hit, else -1.</summary>
+    public int HandleIndex { get; }
     public Vector3 Position { get; }
 
     public PickResult(string instanceId, Vector3 position, string openingId = null)
@@ -16,10 +18,23 @@ public readonly struct PickResult
         Hit = true;
         InstanceId = instanceId;
         OpeningId = openingId;
+        HandleIndex = -1;
         Position = position;
     }
 
+    private PickResult(int handleIndex)
+    {
+        Hit = true;
+        InstanceId = null;
+        OpeningId = null;
+        HandleIndex = handleIndex;
+        Position = Vector3.Zero;
+    }
+
+    public static PickResult Handle(int index) => new(index);
+
     public bool IsOpening => !string.IsNullOrEmpty(OpeningId);
+    public bool IsHandle => HandleIndex >= 0;
 }
 
 /// <summary>
@@ -52,6 +67,9 @@ public partial class InstancePicker : Node3D
 
     public override void _PhysicsProcess(double delta) => _latest = Raycast();
 
+    private const uint BodyMask = 1;   // instance + opening pick colliders (LevelView, default layer)
+    private const uint HandleMask = Gizmos.GizmoLayer.HandleLayer; // gizmo handle colliders
+
     private PickResult Raycast()
     {
         Camera3D cam = GetViewport().GetCamera3D();
@@ -60,9 +78,22 @@ public partial class InstancePicker : Node3D
         Vector2 mouse = GetViewport().GetMousePosition();
         Vector3 from = cam.ProjectRayOrigin(mouse);
         Vector3 to = from + cam.ProjectRayNormal(mouse) * RayLength;
+        PhysicsDirectSpaceState3D space = GetWorld3D().DirectSpaceState;
 
-        var query = PhysicsRayQueryParameters3D.Create(from, to);
-        Godot.Collections.Dictionary hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        // Handles win over the bodies they sit on: a masked handle-only pass first.
+        var handleQuery = PhysicsRayQueryParameters3D.Create(from, to);
+        handleQuery.CollisionMask = HandleMask;
+        Godot.Collections.Dictionary handleHit = space.IntersectRay(handleQuery);
+        if (handleHit.Count > 0)
+        {
+            var hc = handleHit["collider"].As<Node>();
+            if (hc != null && hc.HasMeta("handleIndex"))
+                return PickResult.Handle(hc.GetMeta("handleIndex").AsInt32());
+        }
+
+        var bodyQuery = PhysicsRayQueryParameters3D.Create(from, to);
+        bodyQuery.CollisionMask = BodyMask;
+        Godot.Collections.Dictionary hit = space.IntersectRay(bodyQuery);
         if (hit.Count == 0) return default;
 
         var collider = hit["collider"].As<Node>();

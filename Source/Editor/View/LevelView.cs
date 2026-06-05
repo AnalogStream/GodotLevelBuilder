@@ -24,11 +24,11 @@ public partial class LevelView : Node3D
         _registry = registry;
     }
 
-    public void SetSelected(string instanceId, string openingId)
+    /// <summary>Stores the selection state; the caller drives the rebuild (see EditorContext.Refresh).</summary>
+    public void SetSelection(string instanceId, string openingId)
     {
         _selectedId = instanceId;
         _selectedOpeningId = openingId;
-        Rebuild();
     }
 
     public void Rebuild()
