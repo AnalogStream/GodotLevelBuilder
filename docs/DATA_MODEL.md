@@ -56,6 +56,7 @@ Never identify an instance by list index — indices shift on insert/delete and 
 Nested custom-`Resource` serialization in Godot C# is **the** early risk. Pin these:
 
 1. **Every serializable class is `[GlobalClass] public partial class X : Resource`** with a parameterless ctor. Without `[GlobalClass]` the type won't round-trip cleanly through `.tres`.
+1b. **One serializable class per file, filename = class name** (e.g. `MaterialEntry` *must* live in `MaterialEntry.cs`). Godot reconstructs a `[GlobalClass]` C# resource from a `.tres` by matching the class to a file of the same name; bury it in another file and load fails with *"Cannot instantiate C# script because the associated class could not be found"* and the nested array comes back **empty** while sibling data loads fine. (Hit in M1 — `MaterialEntry` was inside `MaterialLibrary.cs`.)
 2. **Use typed `Godot.Collections.Array<T>` / `Godot.Collections.Dictionary`,** not `System.Collections.Generic.List<T>`. Only Godot collections of Godot-marshalable types serialize. A `List<PrimitiveInstanceData>` will *not* persist.
 3. **Mark persisted members `[Export]`.** Plain public properties are ignored by `ResourceSaver`.
 4. **Nested resources save inline by default** when they have no own `.tres` path — exactly what we want (one self-contained level file). Verify they aren't being written as external `ExtResource` references.

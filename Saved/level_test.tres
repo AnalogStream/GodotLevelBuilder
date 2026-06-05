@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="LevelDocument" format=3]
+
+[ext_resource type="Script" path="res://Source/Core/Data/GridSettings.cs" id="1_rnyu1"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialEntry.cs" id="2_omqq1"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialLibrary.cs" id="3_njlsy"]
+[ext_resource type="Script" path="res://Source/Core/Data/StoreyData.cs" id="4_2t56k"]
+[ext_resource type="Script" path="res://Source/Core/Data/PrimitiveInstanceData.cs" id="5_cr5uv"]
+[ext_resource type="Script" path="res://Source/Core/Data/OpeningData.cs" id="6_rtoe4"]
+[ext_resource type="Script" path="res://Source/Core/Data/LevelDocument.cs" id="7_x8n02"]
+
+[sub_resource type="Resource" id="Resource_63o70"]
+script = ExtResource("1_rnyu1")
+
+[sub_resource type="Resource" id="Resource_hkrul"]
+script = ExtResource("2_omqq1")
+Id = "floor_top"
+DisplayName = "Floor Top"
+MaterialPath = "res://Assets/Materials/floor_top.tres"
+
+[sub_resource type="Resource" id="Resource_n7h4s"]
+script = ExtResource("3_njlsy")
+Entries = Array[ExtResource("2_omqq1")]([SubResource("Resource_hkrul")])
+
+[sub_resource type="Resource" id="Resource_4m63k"]
+script = ExtResource("5_cr5uv")
+Id = "5a12f90a"
+PrimitiveType = "floor"
+Parameters = {
+"depth": 4.0,
+"thickness": 0.2,
+"width": 6.0
+}
+MaterialSlots = {
+"Top": "floor_top"
+}
+
+[sub_resource type="Resource" id="Resource_8uapy"]
+script = ExtResource("4_2t56k")
+Id = "cde7bdcc"
+Name = "Ground Floor"
+Instances = Array[ExtResource("5_cr5uv")]([SubResource("Resource_4m63k")])
+
+[resource]
+script = ExtResource("7_x8n02")
+Name = "Test Level"
+Grid = SubResource("Resource_63o70")
+Materials = SubResource("Resource_n7h4s")
+Storeys = Array[ExtResource("4_2t56k")]([SubResource("Resource_8uapy")])

@@ -33,7 +33,7 @@ Geometry is **procedural `ArrayMesh`** (no live CSG). Each primitive type is a c
 
 ## Where things live
 
-Current layout is the bare Godot template (`Models/Main.cs`, `Scenes/Main.tscn`). The **target** structure below does not all exist yet — create it as you implement. Don't document it as if it's already here.
+Milestone 1 has scaffolded `Source/Core/{Data,Primitives,Geometry,Build}` and `Source/App/Main.cs` (the bare template's `Models/Main.cs` is gone). The `Editor/` and `UI/` trees below are still **target**, not present yet — create them as you implement (M2+).
 
 ```
 Source/
@@ -55,7 +55,7 @@ Assets/           sample Materials/, Icons/
 docs/             design docs (see below)
 ```
 
-> NOTE: the template put `Main.cs` under `Models/`. When you start real work, move app code under `Source/` and update the namespace. Until then, `Models/Main.cs` is the entry stub.
+> NOTE: app code lives under `Source/` with namespaces mirroring folders (`LevelBuilder.Core.Data`, …). `Source/App/Main.cs` is the current entry point, attached to `Scenes/Main.tscn`. It's still the M1 bootstrap (round-trip + bake demo), not the real editor — M2 replaces its body with the editor shell.
 
 ## Conventions
 
