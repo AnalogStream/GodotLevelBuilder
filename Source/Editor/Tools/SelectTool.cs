@@ -46,7 +46,7 @@ public sealed class SelectTool : ITool
             _ctx.SelectOpening(r.InstanceId, r.OpeningId);
             PrimitiveInstanceData wall = _ctx.GetInstance(r.InstanceId);
             OpeningData opening = FindOpening(wall, r.OpeningId);
-            if (opening != null) Begin(new OpeningSlideHandle(wall, opening, _ctx.ElevationOffset));
+            if (opening != null) Begin(new OpeningMoveHandle(wall, opening, _ctx.ElevationOffset));
         }
         else
         {

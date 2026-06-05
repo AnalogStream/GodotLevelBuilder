@@ -51,5 +51,8 @@ public partial class GizmoLayer : Node3D
     {
         ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         AlbedoColor = new Color(0.3f, 0.85f, 1.0f),
+        // Draw on top: opening edge handles sit between the placeholder and the intact wall, and the
+        // far-side instance handles sit behind the body — both opaque, so without this they're buried.
+        NoDepthTest = true,
     };
 }

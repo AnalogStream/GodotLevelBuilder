@@ -52,8 +52,12 @@ public sealed class EditorContext
 
     private List<IEditHandle> BuildHandles()
     {
-        // Openings slide/resize is grabbed via the body for now; resize handles are instance-only.
-        if (SelectedOpeningId != null || SelectedId == null) return new List<IEditHandle>();
+        if (SelectedOpeningId != null)
+        {
+            (PrimitiveInstanceData wall, OpeningData opening) = FindOpening(SelectedId, SelectedOpeningId);
+            return OpeningHandleProvider.Build(wall, opening, ElevationOffset);
+        }
+        if (SelectedId == null) return new List<IEditHandle>();
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
         return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), ElevationOffset);
