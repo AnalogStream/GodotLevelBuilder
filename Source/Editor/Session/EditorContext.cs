@@ -68,6 +68,10 @@ public sealed class EditorContext
     public void MoveOpening(OpeningData opening, float from, float to)
         => Commands.Execute(new MoveOpeningCommand(opening, from, to, View.Rebuild));
 
+    /// <summary>Commits a finished instance drag (the transform has already been moved live to <paramref name="to"/>).</summary>
+    public void MoveInstance(PrimitiveInstanceData instance, Transform3D from, Transform3D to)
+        => Commands.Execute(new MoveInstanceCommand(instance, from, to, View.Rebuild));
+
     public void Select(string id)
     {
         SelectedId = id;
