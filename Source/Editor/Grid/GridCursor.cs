@@ -19,6 +19,8 @@ public partial class GridCursor : Node3D
     [Export] public float CellSize { get; set; } = 1.0f;
     [Export] public float Elevation { get; set; } = 0.0f;
     [Export] public GridSnapMode Mode { get; set; } = GridSnapMode.Cell;
+    /// <summary>When false the cursor hides and reports no hover (e.g. in Select mode).</summary>
+    [Export] public bool Enabled { get; set; } = true;
 
     private const float CornerMarkerHalf = 0.12f;
 
@@ -56,6 +58,8 @@ public partial class GridCursor : Node3D
 
     public override void _Process(double delta)
     {
+        if (!Enabled) { Miss(); return; }
+
         Camera3D cam = GetViewport().GetCamera3D();
         if (cam == null) { Miss(); return; }
 

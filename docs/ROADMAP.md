@@ -54,6 +54,12 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 - [ ] Mesh merging tuning, draw-call/perf pass.
 - [ ] Schema migration framework exercised by a real version bump.
 
+## Next up (designed)
+
+- **Openings as editable objects** — doors/windows become selectable, movable, resizable
+  objects (solid coloured placeholder while selected; hole "applies" on deselect and on
+  bake/save). Full design in `docs/PLANNED_OPENINGS_AS_OBJECTS.md`.
+
 ## Explicitly deferred (track, don't build early)
 
 - Proper mitred **wall corner joins** (footprint graph) — v1 uses overlapping boxes.

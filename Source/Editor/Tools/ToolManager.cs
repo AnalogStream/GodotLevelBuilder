@@ -1,0 +1,86 @@
+using System.Collections.Generic;
+using Godot;
+using LevelBuilder.Editor.Session;
+
+namespace LevelBuilder.Editor.Tools;
+
+/// <summary>
+/// Routes input to the active tool and switches tools by hotkey.
+///   S → Select   F → Floor   W → Wall   Esc/right-click → cancel
+///   left-click → tool action   Delete → delete selected
+///   Ctrl+Z / Ctrl+Y → undo / redo   Ctrl+B → bake .tscn   Ctrl+S → save .tres
+/// </summary>
+public partial class ToolManager : Node
+{
+    private EditorContext _ctx;
+    private ITool _active;
+    private Dictionary<Key, ITool> _tools;
+
+    public void Setup(EditorContext ctx)
+    {
+        _ctx = ctx;
+        _tools = new Dictionary<Key, ITool>
+        {
+            { Key.S, new SelectTool() },
+            { Key.F, new FloorDrawTool() },
+            { Key.W, new WallDrawTool() },
+            { Key.D, new OpeningTool(OpeningPreset.Door) },
+            { Key.N, new OpeningTool(OpeningPreset.Window) },
+        };
+        GD.Print("[tools] S = Select, F = Floor, W = Wall, D = Door, N = wiNdow, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+    }
+
+    public override void _UnhandledInput(InputEvent e)
+    {
+        switch (e)
+        {
+            case InputEventKey k when k.Pressed && !k.Echo:
+                HandleKey(k);
+                break;
+            case InputEventMouseButton mb when mb.Pressed && mb.ButtonIndex == MouseButton.Left:
+                _active?.OnClick();
+                GetViewport().SetInputAsHandled();
+                break;
+            case InputEventMouseButton mb when mb.Pressed && mb.ButtonIndex == MouseButton.Right:
+                _active?.OnCancel();
+                break;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_active == null) return;
+        _ctx.Cursor.Mode = _active.SnapMode; // keep the cursor in the tool's mode (neutralizes Tab mid-draw)
+        _active.UpdatePreview();
+    }
+
+    private void HandleKey(InputEventKey k)
+    {
+        if (k.CtrlPressed)
+        {
+            if (k.Keycode == Key.Z) { _ctx.Undo(); return; }
+            if (k.Keycode == Key.Y) { _ctx.Redo(); return; }
+            if (k.Keycode == Key.B) { _ctx.BakeToGodot(); return; }
+            if (k.Keycode == Key.S) { _ctx.SaveSource(); return; }
+        }
+
+        if (k.Keycode == Key.Escape) { _active?.OnCancel(); return; }
+        if (k.Keycode == Key.Delete) { _ctx.DeleteSelected(); return; }
+
+        if (_tools.TryGetValue(k.Keycode, out ITool tool))
+        {
+            SetActive(tool);
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void SetActive(ITool tool)
+    {
+        _active?.Deactivate();
+        _ctx.ClearSelection();
+        _active = tool;
+        _ctx.Cursor.Enabled = tool.UsesGridCursor;
+        tool.Activate(_ctx);
+        GD.Print($"[tool] {tool.Name} active");
+    }
+}

@@ -15,11 +15,12 @@ public sealed class PrimitiveRegistry
 
     public IEnumerable<IPrimitive> All => _byId.Values;
 
-    /// <summary>The built-in catalog. Milestone 1: floor only.</summary>
+    /// <summary>The built-in catalog.</summary>
     public static PrimitiveRegistry CreateDefault()
     {
         var registry = new PrimitiveRegistry();
         registry.Register(new FloorPrimitive());
+        registry.Register(new WallPrimitive());
         return registry;
     }
 }
