@@ -41,6 +41,26 @@ public static class InstanceHandleProvider
                 AddFace(handles, inst, prim, world, "height", new Vector3(0, h, 0), new Vector3(0, 1, 0), 0f);
                 break;
             }
+            case "ramp":
+            {
+                float l = GetF(inst, "length", 3f), r = GetF(inst, "rise", 3f), w = GetF(inst, "width", 1.2f);
+                var midH = new Vector3(0, r * 0.5f, 0);
+                AddCentered(handles, inst, prim, world, "length", new Vector3(1, 0, 0), l * 0.5f, midH);
+                AddCentered(handles, inst, prim, world, "width", new Vector3(0, 0, 1), w * 0.5f, midH);
+                // Rise grows up from the fixed base (y=0), handled at the high (back) end.
+                AddFace(handles, inst, prim, world, "rise", new Vector3(l * 0.5f, r, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
+            case "stairs":
+            {
+                float run = GetF(inst, "run", 3f), rise = GetF(inst, "totalRise", 3f), w = GetF(inst, "width", 1.2f);
+                var midH = new Vector3(0, rise * 0.5f, 0);
+                AddCentered(handles, inst, prim, world, "run", new Vector3(1, 0, 0), run * 0.5f, midH);
+                AddCentered(handles, inst, prim, world, "width", new Vector3(0, 0, 1), w * 0.5f, midH);
+                // Total rise grows up from the fixed base (y=0), handled at the high (back) end. (Step count not gizmo-editable.)
+                AddFace(handles, inst, prim, world, "totalRise", new Vector3(run * 0.5f, rise, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
         }
         return handles;
     }

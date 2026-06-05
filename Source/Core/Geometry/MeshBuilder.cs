@@ -41,6 +41,18 @@ public static class MeshBuilder
         AddVertex(st, c, normal, uvC);
     }
 
+    /// <summary>
+    /// A single triangle with corners a,b,c given CCW as seen from <paramref name="normal"/>, with
+    /// explicit per-corner UVs. Emitted with Godot's front-face winding (a-c-b), matching AddQuad.
+    /// </summary>
+    public static void AddTri(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 normal,
+        Vector2 uvA, Vector2 uvB, Vector2 uvC)
+    {
+        AddVertex(st, a, normal, uvA);
+        AddVertex(st, c, normal, uvC);
+        AddVertex(st, b, normal, uvB);
+    }
+
     private static void AddVertex(SurfaceTool st, Vector3 p, Vector3 n, Vector2 uv)
     {
         st.SetNormal(n);

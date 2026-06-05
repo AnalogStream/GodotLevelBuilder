@@ -30,6 +30,8 @@ public static class DefaultMaterials
         {
             ["Front"] = Wall, ["Back"] = Wall, ["Top"] = Trim, ["Ends"] = Trim, ["Reveal"] = Trim,
         },
+        "ramp" => new Dictionary<string, string> { ["Surface"] = Floor, ["Side"] = Trim },
+        "stairs" => new Dictionary<string, string> { ["Tread"] = Floor, ["Riser"] = Wall, ["Side"] = Trim },
         _ => new Dictionary<string, string>(),
     };
 
