@@ -15,8 +15,10 @@ public interface ITool
     void Activate(EditorContext ctx);
     void Deactivate();
 
-    /// <summary>Primary (left) click at the current cursor position.</summary>
+    /// <summary>Primary (left) button pressed at the current cursor position.</summary>
     void OnClick();
+    /// <summary>Primary (left) button released — ends a drag. No-op for click-only tools.</summary>
+    void OnRelease();
     /// <summary>Esc / right click — cancel the in-progress action.</summary>
     void OnCancel();
     /// <summary>Per-frame, for rubber-band previews.</summary>

@@ -28,6 +28,7 @@ public abstract class DrawToolBase : ITool
     }
 
     public abstract void OnClick();
+    public virtual void OnRelease() { }
     public abstract void UpdatePreview();
 
     public virtual void OnCancel()

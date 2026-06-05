@@ -27,7 +27,7 @@ public partial class ToolManager : Node
             { Key.D, new OpeningTool(OpeningPreset.Door) },
             { Key.N, new OpeningTool(OpeningPreset.Window) },
         };
-        GD.Print("[tools] S = Select, F = Floor, W = Wall, D = Door, N = wiNdow, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, D = Door, N = wiNdow, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     public override void _UnhandledInput(InputEvent e)
@@ -40,6 +40,9 @@ public partial class ToolManager : Node
             case InputEventMouseButton mb when mb.Pressed && mb.ButtonIndex == MouseButton.Left:
                 _active?.OnClick();
                 GetViewport().SetInputAsHandled();
+                break;
+            case InputEventMouseButton mb when !mb.Pressed && mb.ButtonIndex == MouseButton.Left:
+                _active?.OnRelease(); // not marked handled — LMB-release was never consumed before
                 break;
             case InputEventMouseButton mb when mb.Pressed && mb.ButtonIndex == MouseButton.Right:
                 _active?.OnCancel();

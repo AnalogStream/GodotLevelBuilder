@@ -64,6 +64,10 @@ public sealed class EditorContext
     public void AddOpening(PrimitiveInstanceData wall, OpeningData opening)
         => Commands.Execute(new AddOpeningCommand(wall, opening, View.Rebuild));
 
+    /// <summary>Commits a finished opening drag (the offset has already been moved live to <paramref name="to"/>).</summary>
+    public void MoveOpening(OpeningData opening, float from, float to)
+        => Commands.Execute(new MoveOpeningCommand(opening, from, to, View.Rebuild));
+
     public void Select(string id)
     {
         SelectedId = id;

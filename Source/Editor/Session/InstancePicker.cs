@@ -36,6 +36,20 @@ public partial class InstancePicker : Node3D
     /// <summary>The most recent pick (from the last physics frame).</summary>
     public PickResult Pick() => _latest;
 
+    /// <summary>The current mouse ray (world origin + normalized direction); false if no camera.</summary>
+    public bool MouseRay(out Vector3 from, out Vector3 dir)
+    {
+        from = Vector3.Zero;
+        dir = Vector3.Zero;
+        Camera3D cam = GetViewport().GetCamera3D();
+        if (cam == null) return false;
+
+        Vector2 mouse = GetViewport().GetMousePosition();
+        from = cam.ProjectRayOrigin(mouse);
+        dir = cam.ProjectRayNormal(mouse);
+        return true;
+    }
+
     public override void _PhysicsProcess(double delta) => _latest = Raycast();
 
     private PickResult Raycast()

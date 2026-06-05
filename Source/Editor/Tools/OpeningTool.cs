@@ -33,9 +33,6 @@ public readonly struct OpeningPreset
 /// </summary>
 public sealed class OpeningTool : DrawToolBase
 {
-    private const float SnapStep = 0.25f;
-    private const float Margin = 0.05f;
-
     private readonly OpeningPreset _preset;
 
     public OpeningTool(OpeningPreset preset) => _preset = preset;
@@ -80,15 +77,7 @@ public sealed class OpeningTool : DrawToolBase
         var wallWorld = new Transform3D(wall.LocalTransform.Basis, wall.LocalTransform.Origin + Ctx.ElevationOffset);
         Vector3 local = wallWorld.AffineInverse() * hit.Position;
 
-        float centerU = local.X + length * 0.5f;
-        centerU = Mathf.Round(centerU / SnapStep) * SnapStep;
-        float offset = centerU - _preset.Width * 0.5f;
-
-        float maxOffset = length - _preset.Width - Margin;
-        if (maxOffset < Margin) return false; // wall too short for this opening
-        offset = Mathf.Clamp(offset, Margin, maxOffset);
-
-        if (OverlapsExisting(wall, offset, _preset.Width)) { wall = null; return false; }
+        if (!OpeningPlacement.TrySnapOffset(wall, local.X, _preset.Width, null, out float offset)) { wall = null; return false; }
 
         opening = new OpeningData
         {
@@ -104,17 +93,6 @@ public sealed class OpeningTool : DrawToolBase
         (Vector3 size, Transform3D localCenter) = OpeningGeometry.LocalBox(opening, length, thickness);
         preview = (MeshBuilder.Box(size), wallWorld * localCenter);
         return true;
-    }
-
-    private static bool OverlapsExisting(PrimitiveInstanceData wall, float offset, float width)
-    {
-        float start = offset, end = offset + width;
-        foreach (OpeningData ex in wall.Openings)
-        {
-            float exStart = ex.Offset - Margin, exEnd = ex.Offset + ex.Width + Margin;
-            if (start < exEnd && end > exStart) return true;
-        }
-        return false;
     }
 
     private static float GetF(PrimitiveInstanceData d, string key, float def)
