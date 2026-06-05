@@ -45,21 +45,29 @@ public sealed class WallPrimitive : IPrimitive
 
         float X(float u) => u - l * 0.5f;
 
+        // Explicit UVs keep the texture continuous across the strips/bands an opening splits the wall
+        // into: U is the distance along the wall (front: from u=0; back: mirrored so it reads upright
+        // for a viewer on the −Z side), V is height-from-top (h − y). A solid wall is a single quad,
+        // so these reduce to the same mapping it had before — only fragmented walls change.
         void FrontBack(float ua, float ub, float ya, float yb)
         {
             float xa = X(ua), xb = X(ub);
-            MeshBuilder.AddQuad(front, new(xa, ya, zt), new(xb, ya, zt), new(xb, yb, zt), new(xa, yb, zt), new Vector3(0, 0, 1));
-            MeshBuilder.AddQuad(back, new(xb, ya, zb), new(xa, ya, zb), new(xa, yb, zb), new(xb, yb, zb), new Vector3(0, 0, -1));
+            MeshBuilder.AddQuad(front, new(xa, ya, zt), new(xb, ya, zt), new(xb, yb, zt), new(xa, yb, zt), new Vector3(0, 0, 1),
+                new Vector2(ua, h - ya), new Vector2(ub, h - ya), new Vector2(ub, h - yb), new Vector2(ua, h - yb));
+            MeshBuilder.AddQuad(back, new(xb, ya, zb), new(xa, ya, zb), new(xa, yb, zb), new(xb, yb, zb), new Vector3(0, 0, -1),
+                new Vector2(l - ub, h - ya), new Vector2(l - ua, h - ya), new Vector2(l - ua, h - yb), new Vector2(l - ub, h - yb));
         }
         void TopStrip(float ua, float ub)
         {
             float xa = X(ua), xb = X(ub);
-            MeshBuilder.AddQuad(top, new(xa, h, zt), new(xb, h, zt), new(xb, h, zb), new(xa, h, zb), Vector3.Up);
+            MeshBuilder.AddQuad(top, new(xa, h, zt), new(xb, h, zt), new(xb, h, zb), new(xa, h, zb), Vector3.Up,
+                new Vector2(ua, t), new Vector2(ub, t), new Vector2(ub, 0), new Vector2(ua, 0));
         }
         void BottomStrip(float ua, float ub)
         {
             float xa = X(ua), xb = X(ub);
-            MeshBuilder.AddQuad(ends, new(xa, 0, zb), new(xb, 0, zb), new(xb, 0, zt), new(xa, 0, zt), Vector3.Down);
+            MeshBuilder.AddQuad(ends, new(xa, 0, zb), new(xb, 0, zb), new(xb, 0, zt), new(xa, 0, zt), Vector3.Down,
+                new Vector2(ua, t), new Vector2(ub, t), new Vector2(ub, 0), new Vector2(ua, 0));
         }
         void Reveals(OpeningBox o)
         {

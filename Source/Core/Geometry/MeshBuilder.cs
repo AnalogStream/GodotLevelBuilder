@@ -13,17 +13,25 @@ public static class MeshBuilder
     /// </summary>
     public static void AddQuad(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal)
     {
-        // UVs are planar in metres (1 unit = 1 metre). V is flipped (a,b at V=v; c,d at V=0)
-        // because Godot's UV origin is the texture's top-left with V increasing DOWN, while the
-        // a->d edge runs "up" the face — without the flip every textured face renders upside-down
-        // (and reads as a left-right mirror on a floor viewed top-down).
+        // UVs are planar in metres (1 unit = 1 metre), measured from corner a. V is flipped (a,b at
+        // V=v; c,d at V=0) because Godot's UV origin is the texture's top-left with V increasing DOWN,
+        // while the a->d edge runs "up" the face — without the flip every textured face renders
+        // upside-down (and reads as a left-right mirror on a floor viewed top-down).
         float u = a.DistanceTo(b);
         float v = a.DistanceTo(d);
-        var uvA = new Vector2(0, v);
-        var uvB = new Vector2(u, v);
-        var uvC = new Vector2(u, 0);
-        var uvD = new Vector2(0, 0);
+        AddQuad(st, a, b, c, d, normal,
+            new Vector2(0, v), new Vector2(u, v), new Vector2(u, 0), new Vector2(0, 0));
+    }
 
+    /// <summary>
+    /// As <see cref="AddQuad(SurfaceTool,Vector3,Vector3,Vector3,Vector3,Vector3)"/> but with explicit
+    /// per-corner UVs. Use this when a face is one fragment of a larger surface (e.g. a wall strip
+    /// beside an opening): feed UVs derived from the parent's coordinate system so the texture stays
+    /// continuous across fragments instead of restarting at each quad.
+    /// </summary>
+    public static void AddQuad(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal,
+        Vector2 uvA, Vector2 uvB, Vector2 uvC, Vector2 uvD)
+    {
         AddVertex(st, a, normal, uvA);
         AddVertex(st, c, normal, uvC);
         AddVertex(st, b, normal, uvB);
