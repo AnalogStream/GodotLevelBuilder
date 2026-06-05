@@ -68,6 +68,7 @@ public partial class Main : Node3D
     {
         storey = new StoreyData { Id = Ids.New(), Name = "Ground Floor", BaseElevation = 0f, Height = 3f };
         var doc = new LevelDocument { Name = "Untitled" };
+        DefaultMaterials.Seed(doc.Materials);
         doc.Storeys.Add(storey);
         return doc;
     }

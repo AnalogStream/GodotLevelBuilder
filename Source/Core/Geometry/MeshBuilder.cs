@@ -13,12 +13,16 @@ public static class MeshBuilder
     /// </summary>
     public static void AddQuad(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal)
     {
+        // UVs are planar in metres (1 unit = 1 metre). V is flipped (a,b at V=v; c,d at V=0)
+        // because Godot's UV origin is the texture's top-left with V increasing DOWN, while the
+        // a->d edge runs "up" the face — without the flip every textured face renders upside-down
+        // (and reads as a left-right mirror on a floor viewed top-down).
         float u = a.DistanceTo(b);
         float v = a.DistanceTo(d);
-        var uvA = new Vector2(0, 0);
-        var uvB = new Vector2(u, 0);
-        var uvC = new Vector2(u, v);
-        var uvD = new Vector2(0, v);
+        var uvA = new Vector2(0, v);
+        var uvB = new Vector2(u, v);
+        var uvC = new Vector2(u, 0);
+        var uvD = new Vector2(0, 0);
 
         AddVertex(st, a, normal, uvA);
         AddVertex(st, c, normal, uvC);

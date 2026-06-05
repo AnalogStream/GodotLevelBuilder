@@ -15,51 +15,90 @@ script = ExtResource("1_ih1lu")
 script = ExtResource("3_5k02q")
 
 [sub_resource type="Resource" id="Resource_eln4t"]
-script = ExtResource("5_nf8rp")
-Id = "df3de95d"
-PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1.5)
-Parameters = {
-"depth": 23.0,
-"thickness": 0.2,
-"width": 18.0
-}
-
-[sub_resource type="Resource" id="Resource_wt3rf"]
 script = ExtResource("6_fx6pr")
-Id = "6326d3d7"
-Offset = 2.8
+Id = "5ba84498"
+Offset = 1.55
 Width = 0.9
 Height = 2.1
 
+[sub_resource type="Resource" id="Resource_wt3rf"]
+script = ExtResource("6_fx6pr")
+Id = "238fb232"
+Offset = 1.4
+Width = 1.2
+Height = 0.45000005
+SillHeight = 2.4
+
 [sub_resource type="Resource" id="Resource_n2tdi"]
 script = ExtResource("6_fx6pr")
-Id = "9387060c"
-Offset = 9.15
+Id = "134cbcba"
+Offset = 1.4
+Width = 1.2
+Height = 1.2
+SillHeight = 3.15
+
+[sub_resource type="Resource" id="Resource_f014f"]
+script = ExtResource("6_fx6pr")
+Id = "bd310f4e"
+Offset = 3.15
+Width = 1.2
+Height = 1.2
+SillHeight = 2.4
+
+[sub_resource type="Resource" id="Resource_gpbrx"]
+script = ExtResource("6_fx6pr")
+Id = "8ec3af52"
+Offset = 3.15
 Width = 1.2
 Height = 1.2
 SillHeight = 0.9
 
-[sub_resource type="Resource" id="Resource_f014f"]
-script = ExtResource("5_nf8rp")
-Id = "06068824"
-PrimitiveType = "wall"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -10)
-Parameters = {
-"height": 3.0,
-"length": 18.0,
-"thickness": 0.2
-}
-Openings = Array[ExtResource("6_fx6pr")]([SubResource("Resource_wt3rf"), SubResource("Resource_n2tdi")])
+[sub_resource type="Resource" id="Resource_smeqs"]
+script = ExtResource("6_fx6pr")
+Id = "f7642799"
+Offset = 6.15
+Width = 1.2
+Height = 1.2
 
-[sub_resource type="Resource" id="Resource_gpbrx"]
+[sub_resource type="Resource" id="Resource_ih1lu"]
+script = ExtResource("6_fx6pr")
+Id = "0e9ac101"
+Offset = 7.9
+Width = 1.2
+Height = 2.45
+SillHeight = 0.79999995
+
+[sub_resource type="Resource" id="Resource_ke2yk"]
+script = ExtResource("5_nf8rp")
+Id = "5673c818"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -0.8749999)
+Parameters = {
+"height": 4.0,
+"length": 10.0,
+"thickness": 4.45
+}
+Openings = Array[ExtResource("6_fx6pr")]([SubResource("Resource_eln4t"), SubResource("Resource_wt3rf"), SubResource("Resource_n2tdi"), SubResource("Resource_f014f"), SubResource("Resource_gpbrx"), SubResource("Resource_smeqs"), SubResource("Resource_ih1lu")])
+
+[sub_resource type="Resource" id="Resource_01i8b"]
+script = ExtResource("5_nf8rp")
+Id = "aa2ec55c"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -1.5)
+Parameters = {
+"depth": 11.0,
+"thickness": 0.2,
+"width": 14.0
+}
+
+[sub_resource type="Resource" id="Resource_yg8mj"]
 script = ExtResource("4_8xf4j")
-Id = "02dd93dd"
+Id = "08ad3336"
 Name = "Ground Floor"
-Instances = Array[ExtResource("5_nf8rp")]([SubResource("Resource_eln4t"), SubResource("Resource_f014f")])
+Instances = Array[ExtResource("5_nf8rp")]([SubResource("Resource_ke2yk"), SubResource("Resource_01i8b")])
 
 [resource]
 script = ExtResource("7_58w5t")
 Grid = SubResource("Resource_ltcsi")
 Materials = SubResource("Resource_et28f")
-Storeys = Array[ExtResource("4_8xf4j")]([SubResource("Resource_gpbrx")])
+Storeys = Array[ExtResource("4_8xf4j")]([SubResource("Resource_yg8mj")])

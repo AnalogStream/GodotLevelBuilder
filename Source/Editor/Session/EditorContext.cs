@@ -74,7 +74,10 @@ public sealed class EditorContext
     };
 
     public void AddInstance(PrimitiveInstanceData instance)
-        => Commands.Execute(new AddInstanceCommand(Storey, instance, Refresh));
+    {
+        DefaultMaterials.ApplyDefaults(instance); // give freshly drawn geometry placeholder textures (no picker UI yet)
+        Commands.Execute(new AddInstanceCommand(Storey, instance, Refresh));
+    }
 
     public void Undo() => Commands.Undo();
     public void Redo() => Commands.Redo();

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using LevelBuilder.Core.Data;
@@ -25,7 +24,7 @@ public sealed class SceneBaker
     public Node3D Bake(LevelDocument doc)
     {
         var ctx = new BuildContext { Materials = doc.Materials, CellSize = doc.Grid.CellSize };
-        var matCache = new Dictionary<string, Material>();
+        var materials = new MaterialResolver();
 
         var root = new Node3D { Name = SanitizeName(doc.Name) };
 
@@ -59,7 +58,7 @@ public sealed class SceneBaker
                 }
 
                 ArrayMesh mesh = prim.BuildMesh(inst, ctx);
-                AssignSurfaceMaterials(mesh, prim, inst, doc.Materials, matCache);
+                materials.AssignSurfaceMaterials(mesh, prim, inst, doc.Materials);
 
                 var mi = new MeshInstance3D
                 {
@@ -103,40 +102,6 @@ public sealed class SceneBaker
         Error saveErr = ResourceSaver.Save(packed, path);
         root.QueueFree();
         return saveErr;
-    }
-
-    private static void AssignSurfaceMaterials(
-        ArrayMesh mesh, IPrimitive prim, PrimitiveInstanceData inst,
-        MaterialLibrary library, Dictionary<string, Material> cache)
-    {
-        int surfaces = mesh.GetSurfaceCount();
-        for (int i = 0; i < prim.MaterialSlots.Count && i < surfaces; i++)
-        {
-            string slot = prim.MaterialSlots[i];
-            if (!inst.MaterialSlots.ContainsKey(slot)) continue;
-
-            string materialId = inst.MaterialSlots[slot].AsString();
-            Material mat = ResolveMaterial(materialId, library, cache);
-            if (mat != null)
-            {
-                mesh.SurfaceSetMaterial(i, mat); // surface material — override slot stays free
-            }
-        }
-    }
-
-    private static Material ResolveMaterial(string materialId, MaterialLibrary library, Dictionary<string, Material> cache)
-    {
-        if (string.IsNullOrEmpty(materialId)) return null;
-        if (cache.TryGetValue(materialId, out Material cached)) return cached;
-
-        MaterialEntry entry = library?.Find(materialId);
-        Material mat = null;
-        if (entry != null && !string.IsNullOrEmpty(entry.MaterialPath) && ResourceLoader.Exists(entry.MaterialPath))
-        {
-            mat = ResourceLoader.Load<Material>(entry.MaterialPath);
-        }
-        cache[materialId] = mat;
-        return mat;
     }
 
     private static void SetOwnerRecursive(Node node, Node owner)

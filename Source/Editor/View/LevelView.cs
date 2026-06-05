@@ -1,4 +1,5 @@
 using Godot;
+using LevelBuilder.Core.Build;
 using LevelBuilder.Core.Data;
 using LevelBuilder.Core.Geometry;
 using LevelBuilder.Core.Primitives;
@@ -9,7 +10,8 @@ namespace LevelBuilder.Editor.View;
 /// Live preview of the document: per primitive instance, a visible MeshInstance3D plus a
 /// StaticBody3D pick collider tagged with the instance Id (for selection). Regenerated from
 /// the same BuildMesh the baker uses. M2 rebuilds everything on any change (tiny levels).
-/// Materials are not applied yet (M5); the selected instance gets a highlight override.
+/// Surface materials are resolved from the level's MaterialLibrary (same as the baker) via a
+/// shared MaterialResolver; the selected instance gets a highlight override on top.
 /// </summary>
 public partial class LevelView : Node3D
 {
@@ -17,6 +19,7 @@ public partial class LevelView : Node3D
     private PrimitiveRegistry _registry;
     private string _selectedId;
     private string _selectedOpeningId;
+    private readonly MaterialResolver _materials = new();
 
     public void Setup(LevelDocument doc, PrimitiveRegistry registry)
     {
@@ -61,10 +64,14 @@ public partial class LevelView : Node3D
                 bool ownsSelectedOpening = inst.Id == _selectedId && _selectedOpeningId != null;
                 PrimitiveInstanceData meshSource = ownsSelectedOpening ? WithoutOpening(inst, _selectedOpeningId) : inst;
 
+                ArrayMesh mesh = prim.BuildMesh(meshSource, ctx);
+                _materials.AssignSurfaceMaterials(mesh, prim, meshSource, _doc.Materials); // same surfaces the baker writes
+
                 AddChild(new MeshInstance3D
                 {
-                    Mesh = prim.BuildMesh(meshSource, ctx),
+                    Mesh = mesh,
                     Transform = xform,
+                    // A selected (non-opening) instance overrides all surfaces with the highlight tint.
                     MaterialOverride = (inst.Id == _selectedId && _selectedOpeningId == null) ? HighlightMaterial() : null,
                 });
 
