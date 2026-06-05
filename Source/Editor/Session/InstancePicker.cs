@@ -7,14 +7,19 @@ public readonly struct PickResult
 {
     public bool Hit { get; }
     public string InstanceId { get; }
+    /// <summary>Set when an opening's pick box was hit; <see cref="InstanceId"/> is then its owning wall.</summary>
+    public string OpeningId { get; }
     public Vector3 Position { get; }
 
-    public PickResult(string instanceId, Vector3 position)
+    public PickResult(string instanceId, Vector3 position, string openingId = null)
     {
         Hit = true;
         InstanceId = instanceId;
+        OpeningId = openingId;
         Position = position;
     }
+
+    public bool IsOpening => !string.IsNullOrEmpty(OpeningId);
 }
 
 /// <summary>
@@ -49,6 +54,7 @@ public partial class InstancePicker : Node3D
         var collider = hit["collider"].As<Node>();
         if (collider == null || !collider.HasMeta("instanceId")) return default;
 
-        return new PickResult(collider.GetMeta("instanceId").AsString(), hit["position"].AsVector3());
+        string openingId = collider.HasMeta("openingId") ? collider.GetMeta("openingId").AsString() : null;
+        return new PickResult(collider.GetMeta("instanceId").AsString(), hit["position"].AsVector3(), openingId);
     }
 }

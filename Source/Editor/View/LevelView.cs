@@ -1,5 +1,6 @@
 using Godot;
 using LevelBuilder.Core.Data;
+using LevelBuilder.Core.Geometry;
 using LevelBuilder.Core.Primitives;
 
 namespace LevelBuilder.Editor.View;
@@ -15,6 +16,7 @@ public partial class LevelView : Node3D
     private LevelDocument _doc;
     private PrimitiveRegistry _registry;
     private string _selectedId;
+    private string _selectedOpeningId;
 
     public void Setup(LevelDocument doc, PrimitiveRegistry registry)
     {
@@ -22,9 +24,10 @@ public partial class LevelView : Node3D
         _registry = registry;
     }
 
-    public void SetSelected(string instanceId)
+    public void SetSelected(string instanceId, string openingId)
     {
         _selectedId = instanceId;
+        _selectedOpeningId = openingId;
         Rebuild();
     }
 
@@ -51,17 +54,75 @@ public partial class LevelView : Node3D
                 Transform3D xform = inst.LocalTransform;
                 xform.Origin += offset;
 
+                // While an opening is selected we draw the wall *intact* (its hole suppressed) and
+                // show the opening as a solid placeholder — purely an edit-time view. The pick body
+                // below is still built from the unfiltered instance (holed collision), so the
+                // opening's pick box stays the sole occupant of the void. Bake/save never see this.
+                bool ownsSelectedOpening = inst.Id == _selectedId && _selectedOpeningId != null;
+                PrimitiveInstanceData meshSource = ownsSelectedOpening ? WithoutOpening(inst, _selectedOpeningId) : inst;
+
                 AddChild(new MeshInstance3D
                 {
-                    Mesh = prim.BuildMesh(inst, ctx),
+                    Mesh = prim.BuildMesh(meshSource, ctx),
                     Transform = xform,
-                    MaterialOverride = inst.Id == _selectedId ? HighlightMaterial() : null,
+                    MaterialOverride = (inst.Id == _selectedId && _selectedOpeningId == null) ? HighlightMaterial() : null,
                 });
 
                 AddChild(BuildPickBody(inst, prim, ctx, xform));
+                AddOpeningBodies(inst, xform);
             }
         }
     }
+
+    /// <summary>
+    /// For each opening on a wall, a box pick collider (tagged wall + opening id) so the hole is
+    /// clickable; the selected opening also gets a solid coloured placeholder mesh.
+    /// </summary>
+    private void AddOpeningBodies(PrimitiveInstanceData inst, Transform3D wallXform)
+    {
+        if (inst.PrimitiveType != "wall" || inst.Openings.Count == 0) return;
+        float length = GetF(inst, "length", 1f);
+        float thickness = GetF(inst, "thickness", 0.2f);
+
+        foreach (OpeningData o in inst.Openings)
+        {
+            (Vector3 size, Transform3D localCenter) = OpeningGeometry.LocalBox(o, length, thickness);
+            Transform3D world = wallXform * localCenter;
+
+            var body = new StaticBody3D { Transform = world };
+            body.SetMeta("instanceId", inst.Id);
+            body.SetMeta("openingId", o.Id);
+            body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
+            AddChild(body);
+
+            if (inst.Id == _selectedId && o.Id == _selectedOpeningId)
+                AddChild(new MeshInstance3D
+                {
+                    Mesh = MeshBuilder.Box(size),
+                    Transform = world,
+                    MaterialOverride = PlaceholderMaterial(),
+                });
+        }
+    }
+
+    /// <summary>A copy of the wall sharing its parameters but with one opening removed (for the intact-wall view).</summary>
+    private static PrimitiveInstanceData WithoutOpening(PrimitiveInstanceData inst, string openingId)
+    {
+        var clone = new PrimitiveInstanceData
+        {
+            Id = inst.Id,
+            PrimitiveType = inst.PrimitiveType,
+            LocalTransform = inst.LocalTransform,
+            Parameters = inst.Parameters,
+            MaterialSlots = inst.MaterialSlots,
+        };
+        foreach (OpeningData o in inst.Openings)
+            if (o.Id != openingId) clone.Openings.Add(o);
+        return clone;
+    }
+
+    private static float GetF(PrimitiveInstanceData d, string key, float def)
+        => d.Parameters.ContainsKey(key) ? d.Parameters[key].AsSingle() : def;
 
     private static StaticBody3D BuildPickBody(PrimitiveInstanceData inst, IPrimitive prim, BuildContext ctx, Transform3D xform)
     {
@@ -78,5 +139,14 @@ public partial class LevelView : Node3D
         EmissionEnabled = true,
         Emission = new Color(0.85f, 0.45f, 0.12f),
         EmissionEnergyMultiplier = 0.5f,
+    };
+
+    /// <summary>Solid orange block shown in place of a selected opening's hole.</summary>
+    private static StandardMaterial3D PlaceholderMaterial() => new()
+    {
+        AlbedoColor = new Color(1.0f, 0.55f, 0.15f),
+        EmissionEnabled = true,
+        Emission = new Color(0.9f, 0.45f, 0.1f),
+        EmissionEnergyMultiplier = 0.6f,
     };
 }

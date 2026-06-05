@@ -101,10 +101,7 @@ public sealed class OpeningTool : DrawToolBase
         };
 
         // Preview box at the opening volume (slightly thicker so it pokes through the wall).
-        var size = new Vector3(_preset.Width, _preset.Height, thickness + 0.02f);
-        float localX = offset + _preset.Width * 0.5f - length * 0.5f;
-        float localY = _preset.Sill + _preset.Height * 0.5f;
-        var localCenter = new Transform3D(Basis.Identity, new Vector3(localX, localY, 0));
+        (Vector3 size, Transform3D localCenter) = OpeningGeometry.LocalBox(opening, length, thickness);
         preview = (MeshBuilder.Box(size), wallWorld * localCenter);
         return true;
     }
