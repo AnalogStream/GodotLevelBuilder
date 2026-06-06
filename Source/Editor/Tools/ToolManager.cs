@@ -28,8 +28,10 @@ public partial class ToolManager : Node
             { Key.N, new OpeningTool(OpeningPreset.Window) },
             { Key.R, new RampDrawTool() },
             { Key.T, new StairsDrawTool() },
+            { Key.G, new RampPlaneDrawTool() },
+            { Key.H, new StairPlaneDrawTool() },
         };
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     public override void _UnhandledInput(InputEvent e)

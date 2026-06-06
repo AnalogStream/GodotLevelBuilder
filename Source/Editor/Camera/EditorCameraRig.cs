@@ -7,6 +7,8 @@ namespace LevelBuilder.Editor.Camera;
 ///   • Middle mouse drag        → orbit around the focus point
 ///   • Shift + middle mouse drag → pan the focus point
 ///   • Mouse wheel              → zoom (dolly toward/away from focus)
+///   • Press 7                  → toggle orthographic top-down view (Blender numpad-7),
+///                                 looking straight down for laying out the floor plan
 ///
 /// This node IS the focus pivot: its Position is the look-at target, its rotation
 /// is the orbit, and the child Camera3D sits back along local +Z at <see cref="Distance"/>.
@@ -25,6 +27,11 @@ public partial class EditorCameraRig : Node3D
     private Camera3D _camera;
     private bool _orbiting;
     private bool _panning;
+    private bool _topDown;
+
+    // Saved perspective orbit so toggling 7 off restores the previous viewpoint.
+    private float _savedYaw;
+    private float _savedPitch;
 
     public override void _Ready()
     {
@@ -38,6 +45,9 @@ public partial class EditorCameraRig : Node3D
     {
         switch (e)
         {
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Key7 or Key.Kp7 }:
+                ToggleTopDown();
+                break;
             case InputEventMouseButton mb:
                 HandleButton(mb);
                 break;
@@ -45,6 +55,25 @@ public partial class EditorCameraRig : Node3D
                 HandleMotion(mm);
                 break;
         }
+    }
+
+    private void ToggleTopDown()
+    {
+        if (!_topDown)
+        {
+            _savedYaw = _yaw;
+            _savedPitch = _pitch;
+            _yaw = 0f;
+            _pitch = Mathf.DegToRad(-90f); // look straight down
+            _topDown = true;
+        }
+        else
+        {
+            _yaw = _savedYaw;
+            _pitch = _savedPitch;
+            _topDown = false;
+        }
+        Apply();
     }
 
     private void HandleButton(InputEventMouseButton mb)
@@ -66,7 +95,7 @@ public partial class EditorCameraRig : Node3D
 
     private void HandleMotion(InputEventMouseMotion mm)
     {
-        if (_orbiting)
+        if (_orbiting && !_topDown)
         {
             _yaw -= mm.Relative.X * OrbitSensitivity;
             _pitch -= mm.Relative.Y * OrbitSensitivity;
@@ -94,5 +123,18 @@ public partial class EditorCameraRig : Node3D
         // Default Euler order (YXZ) gives turntable orbit: yaw about global Y, pitch about local X.
         Rotation = new Vector3(_pitch, _yaw, 0);
         _camera.Position = new Vector3(0, 0, Distance);
+
+        // Top-down uses an orthographic projection (no perspective foreshortening), so the
+        // floor plan reads true-to-scale like a blueprint. Size tracks Distance so the wheel
+        // still zooms. Perspective everywhere else.
+        if (_topDown)
+        {
+            _camera.Projection = Camera3D.ProjectionType.Orthogonal;
+            _camera.Size = Distance;
+        }
+        else
+        {
+            _camera.Projection = Camera3D.ProjectionType.Perspective;
+        }
     }
 }

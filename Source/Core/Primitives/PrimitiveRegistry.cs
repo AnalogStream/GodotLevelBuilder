@@ -23,6 +23,8 @@ public sealed class PrimitiveRegistry
         registry.Register(new WallPrimitive());
         registry.Register(new RampPrimitive());
         registry.Register(new StairsPrimitive());
+        registry.Register(new RampPlanePrimitive());
+        registry.Register(new StairPlanePrimitive());
         return registry;
     }
 }
