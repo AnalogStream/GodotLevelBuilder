@@ -33,7 +33,7 @@ The source is never derived from the bake. The bake is a pure function of the so
 Steps:
 1. For each primitive instance, call `BuildMesh` and `BuildCollision`.
 2. **Merge meshes by material** across the storey (group surfaces sharing a material id into one `MeshInstance3D`) to cut draw calls.
-3. Resolve each material slot → `MaterialLibrary` entry → the actual material `.tres`, and assign it to the **mesh surface**.
+3. Resolve each material slot → `MaterialLibrary` entry → the actual material (a loaded `.tres`, or a `StandardMaterial3D` built from the entry's `TexturePath`), and assign it to the **mesh surface**. Resolution goes through `MaterialResolver`, the *same* class the live `LevelView` uses — so the editor preview and the bake are guaranteed identical. Runtime-built texture materials are embedded inline as sub-resources in the `.tscn`, on the surface (override stays free — see the rule below).
 4. Emit collision under a `StaticBody3D` per storey.
 5. `PackedScene.Pack(root)` → `ResourceSaver.Save(scene, targetPath)`.
 
