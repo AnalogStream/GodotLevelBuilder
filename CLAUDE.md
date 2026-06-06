@@ -77,5 +77,6 @@ docs/             design docs (see below)
 - `docs/DATA_MODEL.md` — the `Resource` graph, serialization rules & C# gotchas.
 - `docs/PRIMITIVES.md` — the primitive contract, wall openings, frame binding, known-hard cases.
 - `docs/EXPORT.md` — save/load + bake pipeline, material & node-naming rules.
+- `docs/UI.md` — editor shell layout, panels, the SubViewport, and the drag-drop/texture gotchas.
 - `docs/ROADMAP.md` — milestones, starting with the thin end-to-end slice.
 - `docs/CONVENTIONS.md` — C#/Godot coding conventions.
