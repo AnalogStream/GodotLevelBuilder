@@ -37,11 +37,26 @@ public sealed class MaterialResolver
         if (_cache.TryGetValue(materialId, out Material cached)) return cached;
 
         MaterialEntry entry = library?.Find(materialId);
-        Material mat = null;
-        if (entry != null && !string.IsNullOrEmpty(entry.MaterialPath) && ResourceLoader.Exists(entry.MaterialPath))
-            mat = ResourceLoader.Load<Material>(entry.MaterialPath);
+        Material mat = BuildFrom(entry);
 
         _cache[materialId] = mat;
         return mat;
+    }
+
+    /// <summary>An entry's material: a loaded .material/.tres if it has one, else a StandardMaterial3D built from its texture.</summary>
+    private static Material BuildFrom(MaterialEntry entry)
+    {
+        if (entry == null) return null;
+
+        if (!string.IsNullOrEmpty(entry.MaterialPath) && ResourceLoader.Exists(entry.MaterialPath))
+            return ResourceLoader.Load<Material>(entry.MaterialPath);
+
+        if (!string.IsNullOrEmpty(entry.TexturePath) && ResourceLoader.Exists(entry.TexturePath))
+        {
+            var tex = ResourceLoader.Load<Texture2D>(entry.TexturePath);
+            return tex == null ? null : new StandardMaterial3D { AlbedoTexture = tex };
+        }
+
+        return null;
     }
 }

@@ -2,6 +2,14 @@
 
 Build order is chosen to **prove the riskiest integrations first** (C# nested-Resource serialization, and the bake pipeline), then add breadth. Don't build ten primitives before the spine works end to end.
 
+> **Status (current):** M1–M4 done and F5-verified. Primitive breadth (M6) partly done — floor, wall,
+> ramp, stairs, ramp-plane, stair-plane. Editor UI now exists (native Control nodes, see `UI.md`):
+> scene-tree dock, primitive/opening palette, right inspector, and a **texture library with
+> drag-drop** (onto the inspector slot or the 3D object) covering most of M5. Openings-as-objects
+> (the "Next up" item below) is done. Remaining headline gaps: per-type/default material assignment,
+> a full `ParamSpec`-driven inspector, arbitrary floor polygons, and the export override round-trip
+> check.
+
 ## Milestone 1 — The spine (one primitive, whole pipeline)
 
 Goal: a single Floor goes all the way through, proving serialization + bake before any breadth.
@@ -38,8 +46,10 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 
 ## Milestone 5 — Materials
 
-- [ ] `MaterialLibrary` editing UI + `MaterialPicker`; assign materials to slots in the inspector.
-- [ ] Baker resolves slots → surface materials; **override survival round-trip verified** (`EXPORT.md`).
+- [x] Texture library (`TexturePalettePanel`) + drag-drop assign onto the 3D object or the inspector's Texture slot; runtime-built materials from raw textures (`MaterialEntry.TexturePath`). Whole-object paint, undoable. See `UI.md`.
+- [x] Baker resolves slots → surface materials (shared `MaterialResolver`, preview == bake).
+- [ ] Per-slot assignment + **set-for-type** (apply to all existing instances of a type AND a persisted per-type default in `LevelDocument`).
+- [ ] **Override survival round-trip verified** (`EXPORT.md`) — bake a textured object, reopen the `.tscn`, confirm the texture is on the mesh surface with `surface_material_override` empty.
 
 ## Milestone 6 — Primitive breadth
 
@@ -56,9 +66,17 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 
 ## Next up (designed)
 
-- **Openings as editable objects** — doors/windows become selectable, movable, resizable
-  objects (solid coloured placeholder while selected; hole "applies" on deselect and on
-  bake/save). Full design in `docs/PLANNED_OPENINGS_AS_OBJECTS.md`.
+- **Set-for-type materials** — apply a texture to all existing instances of a type AND persist a
+  per-type default in `LevelDocument` (supersedes the hardcoded `DefaultMaterials.SlotsFor` for new
+  draws; round-trips to `.tres`).
+- **ParamSpec-driven inspector** — generate editable fields (spinbox/checkbox/enum) per primitive
+  from its `ParamSpec`, plus per-slot material assignment.
+
+### Done
+
+- **Openings as editable objects** — doors/windows are selectable, movable, resizable objects
+  (solid coloured placeholder while selected; hole "applies" on deselect and on bake/save). Design
+  in `docs/PLANNED_OPENINGS_AS_OBJECTS.md`.
 
 ## Explicitly deferred (track, don't build early)
 

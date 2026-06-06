@@ -155,6 +155,28 @@ public sealed class EditorContext
         Commands.Execute(new AddInstanceCommand(Storey, instance, Refresh));
     }
 
+    /// <summary>
+    /// Paints every material slot of an instance with <paramref name="texturePath"/> (undoable).
+    /// Ensures the texture exists in the level's material library first. No-op if the instance is gone.
+    /// </summary>
+    public void AssignTextureToInstance(string instanceId, string texturePath)
+    {
+        PrimitiveInstanceData inst = GetInstance(instanceId);
+        if (inst == null) return;
+        IPrimitive prim = Registry.Get(inst.PrimitiveType);
+        if (prim == null) return;
+
+        // Registering the texture in the library is deliberately OUTSIDE undo: the MaterialLibrary
+        // is an append-only, id-deduped pool of "imported" materials (like DefaultMaterials.Seed),
+        // not per-edit state. Only the slot assignment below is undoable. (Undo leaves the entry;
+        // harmless — it's reused on redo or any later assignment of the same texture.)
+        string materialId = TextureCatalog.EnsureEntry(Document.Materials, texturePath);
+        var to = new Dictionary<string, string>();
+        foreach (string slot in prim.MaterialSlots) to[slot] = materialId;
+
+        Commands.Execute(new AssignMaterialCommand(inst, to, Refresh));
+    }
+
     public void Undo() => Commands.Undo();
     public void Redo() => Commands.Redo();
 

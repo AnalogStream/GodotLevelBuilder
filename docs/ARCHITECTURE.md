@@ -60,7 +60,7 @@ LevelBuilder is a standalone Godot 4.6 / C# app. It edits a **Level** (a buildin
 | `Editor/Tools` | Interaction modes | `ITool`, `ToolManager`, `SelectTool`, `FloorDrawTool`, `WallDrawTool`, `PlaceTool` |
 | `Editor/Commands` | Undo/redo | `ICommand`, `CommandStack` |
 | `Editor/Selection` | Selection + gizmos | `SelectionSet`, transform gizmos |
-| `UI` | Panels & widgets | `Toolbar`, `PrimitivePalette`, `Inspector`, `StoreySelector`, `MaterialPicker` |
+| `UI` | Panels & widgets (native Control nodes, built in code) | `SceneTreePanel`, `InspectorPanel`, `PrimitivePalettePanel`, `TexturePalettePanel`, drag-drop (`TextureSwatch`/`TextureDropZone`/`ViewportDropOverlay`) |
 
 ## Key design decisions (and why)
 
@@ -69,5 +69,6 @@ LevelBuilder is a standalone Godot 4.6 / C# app. It edits a **Level** (a buildin
 - **Command-stack mutations.** Single source of truth for undo/redo + dirty tracking; tools and UI stay dumb.
 - **Two artifacts (.tres + .tscn).** Editable source decoupled from optimized output; rebake never loses the source, and consumer material overrides survive (see `EXPORT.md`).
 - **Storeys as the organizing axis.** Multi-floor buildings fall out naturally; the grid renders at the active storey's elevation.
+- **Native Godot UI in a SubViewport.** The whole editor is `Control` nodes built in code; the 3D view lives in a `SubViewport` so docked panels shrink it rather than overlap it. Chosen over an embedded Avalonia/Estragonia layer because this is a viewport-centric tool (drag a texture onto a 3D object, gizmos, picking) — see `UI.md` for the rationale and the SubViewport/drag-drop gotchas.
 
-See `DATA_MODEL.md`, `PRIMITIVES.md`, `EXPORT.md` for the load-bearing details, and `ROADMAP.md` for build order.
+See `DATA_MODEL.md`, `PRIMITIVES.md`, `EXPORT.md`, `UI.md` for the load-bearing details, and `ROADMAP.md` for build order.

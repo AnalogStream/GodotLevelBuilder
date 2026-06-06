@@ -51,6 +51,9 @@ public partial class InstancePicker : Node3D
     /// <summary>The most recent pick (from the last physics frame).</summary>
     public PickResult Pick() => _latest;
 
+    /// <summary>Current mouse position in viewport pixels (for screen-space drag thresholds).</summary>
+    public Vector2 MouseScreen() => GetViewport().GetMousePosition();
+
     /// <summary>The current mouse ray (world origin + normalized direction); false if no camera.</summary>
     public bool MouseRay(out Vector3 from, out Vector3 dir)
     {

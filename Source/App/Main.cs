@@ -59,7 +59,8 @@ public partial class Main : Node3D
 
         // Stretch makes the SubViewport track the container's size, which is what keeps the
         // mouse-to-camera projection correct even though the viewport is offset by the panel.
-        var viewportContainer = new SubViewportContainer
+        // The container also accepts dropped texture swatches (raycasts to the object under the drop).
+        var viewportContainer = new ViewportDropContainer
         {
             Stretch = true,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
@@ -68,17 +69,24 @@ public partial class Main : Node3D
         viewportContainer.AddChild(viewport);
 
         var sceneTree = new SceneTreePanel();
+        var inspector = new InspectorPanel();
 
-        // Top row: scene-tree dock | 3D view.
+        // Top row: scene-tree | (3D view | inspector). Nested split so the viewport expands
+        // while both side docks keep their width.
+        var rightSplit = new HSplitContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        rightSplit.AddChild(viewportContainer); // expands to fill
+        rightSplit.AddChild(inspector);         // right dock (fixed width)
+
         var split = new HSplitContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
-        split.AddChild(sceneTree);          // left: docked panel
-        split.AddChild(viewportContainer);  // right: 3D view (expands to fill)
+        split.AddChild(sceneTree);  // left dock
+        split.AddChild(rightSplit); // viewport + inspector
 
-        // Bottom dock: tabbed — primitive palette now, textures later.
+        // Bottom dock: tabbed — primitive palette + texture library.
         var palette = new PrimitivePalettePanel { Name = "Primitives" };
+        var textures = new TexturePalettePanel { Name = "Textures" };
         var bottomTabs = new TabContainer { CustomMinimumSize = new Vector2(0, 180) };
         bottomTabs.AddChild(palette);
-        bottomTabs.AddChild(BuildTexturesPlaceholder());
+        bottomTabs.AddChild(textures);
 
         var outer = new VSplitContainer();
         outer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -99,16 +107,12 @@ public partial class Main : Node3D
             Gizmos = gizmos,
         };
         sceneTree.Setup(ctx);        // subscribe before the first Changed fires below
+        inspector.Setup(ctx);
+        viewportContainer.Setup(viewport, ctx.AssignTextureToInstance); // drop a swatch onto an object
         ctx.SetActiveStorey(storey); // unified path: positions grid + cursor at the storey's elevation
         tools.Setup(ctx);
         palette.Setup(registry, tools); // after tools.Setup so the primitive->tool map exists
-    }
-
-    private static Control BuildTexturesPlaceholder()
-    {
-        var center = new CenterContainer { Name = "Textures" };
-        center.AddChild(new Label { Text = "Textures — coming soon", Modulate = new Color(1, 1, 1, 0.5f) });
-        return center;
+        textures.Setup();
     }
 
     private static LevelDocument NewDocument(out StoreyData storey)

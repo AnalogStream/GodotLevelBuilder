@@ -13,6 +13,11 @@ public partial class MaterialEntry : Resource
 {
     [Export] public string Id { get; set; } = "";
     [Export] public string DisplayName { get; set; } = "";
-    /// <summary>res:// path to a Material resource (.tres / .material).</summary>
+    /// <summary>res:// path to a Material resource (.tres / .material). Takes priority over <see cref="TexturePath"/>.</summary>
     [Export] public string MaterialPath { get; set; } = "";
+    /// <summary>
+    /// res:// path to a raw Texture2D. When <see cref="MaterialPath"/> is empty, the resolver builds a
+    /// StandardMaterial3D with this as its albedo — so picking a texture needs no on-disk .material file.
+    /// </summary>
+    [Export] public string TexturePath { get; set; } = "";
 }

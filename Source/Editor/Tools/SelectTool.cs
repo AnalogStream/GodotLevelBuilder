@@ -20,6 +20,11 @@ public sealed class SelectTool : ITool
 
     private IEditHandle _active; // the handle currently being dragged, if any
     private Vector3 _grabStart;
+    private Vector2 _grabScreen; // mouse pixel position when the handle was grabbed
+    private bool _dragging;      // becomes true once the mouse moves past the click deadzone
+
+    /// <summary>Pixels the mouse must travel before a press is treated as a drag (not a select-click).</summary>
+    private const float DragDeadzonePx = 6f;
 
     public string Name => "Select";
     public GridSnapMode SnapMode => GridSnapMode.Cell; // unused (cursor hidden)
@@ -59,6 +64,19 @@ public sealed class SelectTool : ITool
     public void UpdatePreview()
     {
         if (_active == null) return;
+
+        // The release that ends a drag is delivered as an _UnhandledInput event to the viewport — but
+        // if the mouse is let go over a UI panel (inspector, scene tree, the texture dock), that panel
+        // consumes the release and OnRelease never fires. Without this guard the handle stays armed and
+        // the object follows the cursor forever. Poll the real button state and disarm as soon as it's up.
+        if (!Input.IsMouseButtonPressed(MouseButton.Left)) { OnRelease(); return; }
+
+        // Click-vs-drag deadzone: a plain select-click shouldn't move/resize anything. Only start
+        // applying once the mouse has travelled past a few pixels (jitter on a narrow viewport can
+        // otherwise project to a whole-cell snap and make the object jump on selection).
+        if (!_dragging && _ctx.Picker.MouseScreen().DistanceTo(_grabScreen) < DragDeadzonePx) return;
+        _dragging = true;
+
         if (!_ctx.Picker.MouseRay(out Vector3 from, out Vector3 dir)) return;
         if (!_active.Grab(from, dir, out Vector3 now)) return;
 
@@ -90,6 +108,8 @@ public sealed class SelectTool : ITool
         if (!_ctx.Picker.MouseRay(out Vector3 from, out Vector3 dir)) { _active = null; return; }
         if (!handle.Grab(from, dir, out _grabStart)) { _active = null; return; }
         _active = handle;
+        _grabScreen = _ctx.Picker.MouseScreen();
+        _dragging = false;
     }
 
     private void CancelDrag()
