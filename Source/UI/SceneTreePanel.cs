@@ -79,6 +79,8 @@ public partial class SceneTreePanel : PanelContainer
 
         foreach (StoreyData storey in SortedStoreys())
         {
+            if (!ShouldShow(storey)) continue;
+
             bool active = ReferenceEquals(storey, _ctx.Storey);
             TreeItem sItem = AddRow(root, $"s|{storey.Id}", StoreyLabel(storey, active));
             if (active) sItem.SetCustomColor(0, ActiveStoreyColor);
@@ -148,6 +150,16 @@ public partial class SceneTreePanel : PanelContainer
     }
 
     // ---- helpers ---------------------------------------------------------
+
+    /// <summary>
+    /// An empty storey is hidden until it gets its first object — the tree only shows storeys you've
+    /// actually built in. The ground floor (the originally-seeded storey, always <c>Storeys[0]</c>) is
+    /// the one exception: it stays visible as the default working level even while empty.
+    /// </summary>
+    private bool ShouldShow(StoreyData s) => s.Instances.Count > 0 || IsGround(s);
+
+    private bool IsGround(StoreyData s)
+        => _ctx.Document.Storeys.Count > 0 && ReferenceEquals(s, _ctx.Document.Storeys[0]);
 
     /// <summary>A cheap fingerprint of the hierarchy + active storey; a change means "rebuild".</summary>
     private string StructureSignature()
