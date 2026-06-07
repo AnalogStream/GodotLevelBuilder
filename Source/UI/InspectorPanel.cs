@@ -34,11 +34,15 @@ public partial class InspectorPanel : PanelContainer
         var body = new VBoxContainer();
         margin.AddChild(body);
 
-        _title = new Label();
+        _title = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         _title.AddThemeFontSizeOverride("font_size", 16);
         body.AddChild(_title);
 
-        _details = new Label { Modulate = new Color(1, 1, 1, 0.7f) };
+        // Autowrap so long help text ("Select an object…") wraps within the fixed 260px dock
+        // instead of forcing the PanelContainer wider. Without this the panel width swings between
+        // selected (short "id …") and empty (long sentence) states, resizing the SubViewport and
+        // visibly reframing the camera on every select/deselect.
+        _details = new Label { Modulate = new Color(1, 1, 1, 0.7f), AutowrapMode = TextServer.AutowrapMode.WordSmart };
         body.AddChild(_details);
 
         body.AddChild(new HSeparator());
