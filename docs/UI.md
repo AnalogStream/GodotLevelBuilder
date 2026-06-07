@@ -78,8 +78,27 @@ primitives — they're `OpeningTool` presets, listed by id `"door"`/`"window"` w
 maps to those tools.
 
 ### TexturePalettePanel (bottom tab 2)
-The texture library: a grid of `TextureSwatch` (drag sources), grouped by color folder, loaded by
-`TextureCatalog` from the Kenney prototype pack. Pure drag sources — no editor state.
+The texture library: a grid of `TextureSwatch` (drag sources), grouped by source, loaded by
+`TextureCatalog.Load()` — the bundled Kenney prototype pack (grouped by color folder) plus any the
+user has added (grouped `"custom"`). Drag sources only — no editor state.
+
+**Add your own textures.** An **"Add texture…"** button opens a `FileDialog`
+(`Access = Filesystem` so it browses the whole disk, `OpenFiles` for multi-select; png/jpg/jpeg/
+webp/bmp/tga). `TextureCatalog.ImportUserTexture` **copies** each chosen file into
+`res://Assets/user_textures/` (`DirAccess.CopyAbsolute`) so it gets a stable `res://` path that
+save/bake can reference — an external OS path can't be referenced by a `.tscn`/`.tres`. The grid then
+repopulates (`Populate()`), and user textures also reappear next session because `Load()` rescans the
+folder.
+
+**Why a just-added texture shows immediately — `TextureLoader`.** A PNG copied into the project at
+runtime has no imported `.ctex` until the Godot editor reimports it, so `ResourceLoader` can't see it.
+`Core/Data/TextureLoader.Load(path)` tries `ResourceLoader` first (imported = mipmaps/compression),
+then falls back to `Image.LoadFromFile(ProjectSettings.GlobalizePath(path))` →
+`ImageTexture.CreateFromImage`, which reads the raw file directly. Both `TextureSwatch` (the thumbnail)
+and `MaterialResolver` (the applied material) route through it, so the swatch *and* the painted
+geometry appear the same session, no reimport required. (Cached by path; re-adding a different file
+under the same name shows the stale one until restart — minor, two caches to evict for a real fix.)
+See `EXPORT.md` for the one bake-time caveat (baking before reimport embeds the texture inline).
 
 ## Drag-and-drop: applying textures
 

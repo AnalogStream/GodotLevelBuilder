@@ -47,6 +47,7 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 ## Milestone 5 — Materials
 
 - [x] Texture library (`TexturePalettePanel`) + drag-drop assign onto the 3D object or the inspector's Texture slot; runtime-built materials from raw textures (`MaterialEntry.TexturePath`). Whole-object paint, undoable. See `UI.md`.
+- [x] **User-added textures** — "Add texture…" copies an image into `res://Assets/user_textures/` (stable `res://` path); `TextureLoader` raw-decode fallback shows/applies it the same session without an editor reimport. See `UI.md`; bake caveat in `EXPORT.md`.
 - [x] Baker resolves slots → surface materials (shared `MaterialResolver`, preview == bake).
 - [ ] Per-slot assignment + **set-for-type** (apply to all existing instances of a type AND a persisted per-type default in `LevelDocument`).
 - [ ] **Override survival round-trip verified** (`EXPORT.md`) — bake a textured object, reopen the `.tscn`, confirm the texture is on the mesh surface with `surface_material_override` empty.

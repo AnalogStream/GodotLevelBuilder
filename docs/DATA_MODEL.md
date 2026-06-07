@@ -44,6 +44,8 @@ MaterialLibrary : Resource
 
 **A material entry is either a file or a raw texture.** `MaterialPath` points at a `Material` resource (`.tres`/`.material`). `TexturePath` points at a raw `Texture2D`; when `MaterialPath` is empty the resolver builds a `StandardMaterial3D` with it as albedo at runtime (cached) — so picking from the texture library needs no on-disk `.material` per texture. `MaterialResolver` (shared by the live view and the baker) does the resolution; `MaterialSlots` still stores only string ids, so the `.tres` round-trip is unaffected. The library is an **append-only, id-deduped pool** (seeded defaults + textures registered on first use via `TextureCatalog.EnsureEntry`); registration lives outside undo, only slot *assignment* is undoable.
 
+**Texture paths are always `res://`.** Both the bundled pack and **user-added** textures live under the project: "Add texture…" copies the chosen file into `res://Assets/user_textures/` precisely so `TexturePath` is a stable project-relative path that survives save/bake (an external OS path could not be referenced by a `.tres`/`.tscn`). Loading goes through `TextureLoader.Load`, which prefers Godot's imported `.ctex` but falls back to a raw `Image.LoadFromFile` decode for a texture added this session (no `.ctex` yet) — see `UI.md` for the flow and `EXPORT.md` for the bake-before-reimport caveat.
+
 ## IDs
 
 Every `StoreyData`, `PrimitiveInstanceData`, and `OpeningData` carries a **stable string `Id`** (GUID-ish, assigned on creation, never reused). IDs are what:

@@ -46,6 +46,21 @@ Write the library material onto the **mesh surface** (`ArrayMesh` surface materi
 
 Two clean layers that don't collide: rebaking refreshes defaults without clobbering the game's overrides. If the baker wrote into the override slot instead, every rebake would fight the consumer. **Verify with a round-trip: bake → instance in a test scene → set an override → rebake → confirm the override survives.**
 
+### User textures: reimport before baking
+
+User-added textures are copied into `res://Assets/user_textures/` (see `DATA_MODEL.md`/`UI.md`) so they
+carry a stable `res://` path. But a texture added during a running session has no imported `.ctex` until
+the Godot **editor** reimports it (focus the editor once — same step as the Kenney pack). This affects
+*how* the bake references it, not *whether* it works:
+
+- **After reimport (recommended):** the bake references a clean `res://` ext_resource. Smaller `.tscn`.
+- **Before reimport:** `MaterialResolver` falls back to a raw `Image` decode, producing a pathless
+  runtime `ImageTexture` that Godot **embeds inline** in the `.tscn`. Still correct — still on the mesh
+  surface, override slot still free — just larger. Self-heals on a re-bake after reimport.
+
+So: **focus the editor once after adding textures, then bake.** No bake-time guard exists or is needed;
+the divergence is bloat, not breakage.
+
 ### Node-naming rule (load-bearing)
 
 Node names are **derived from stable IDs** (`Storey_<storeyId>`, `Mesh_<materialId>`), never from iteration order or array index. Reason: in Godot, instance-level `surface_material_override` is keyed by **node path**. If a rebake renames or reorders nodes, the consumer's overrides silently rebind to the wrong node — or vanish. Determinism here is a correctness requirement, not a nicety:
