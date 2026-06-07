@@ -60,9 +60,15 @@ public sealed class SceneBaker
                 ArrayMesh mesh = prim.BuildMesh(inst, ctx);
                 materials.AssignSurfaceMaterials(mesh, prim, inst, doc.Materials);
 
+                // Prefix with the primitive type (Floor_, Wall_, …) so the baked tree is readable
+                // instead of an opaque Mesh_<id>. The <id> stays in the name to keep it unique,
+                // stable, and deterministic across rebake — that's what lets consumer material
+                // overrides survive a rebake (docs/EXPORT.md, the type never changes for an instance).
+                string typeName = TypeName(inst.PrimitiveType);
+
                 var mi = new MeshInstance3D
                 {
-                    Name = $"Mesh_{inst.Id}",
+                    Name = $"{typeName}_{inst.Id}",
                     Mesh = mesh,
                     Transform = inst.LocalTransform,
                 };
@@ -73,7 +79,7 @@ public sealed class SceneBaker
                 {
                     var cs = new CollisionShape3D
                     {
-                        Name = $"Shape_{inst.Id}_{s}",
+                        Name = $"{typeName}Shape_{inst.Id}_{s}",
                         Shape = shapes[s],
                         Transform = inst.LocalTransform,
                     };
@@ -112,6 +118,13 @@ public sealed class SceneBaker
             SetOwnerRecursive(child, owner);
         }
     }
+
+    /// <summary>"wall" → "Wall", "floor" → "Floor". Falls back to "Mesh" for a blank type.
+    /// Used as the node-name prefix so the baked tree reads by type, not an opaque Mesh_&lt;id&gt;.</summary>
+    private static string TypeName(string primitiveType)
+        => string.IsNullOrEmpty(primitiveType)
+            ? "Mesh"
+            : char.ToUpperInvariant(primitiveType[0]) + primitiveType[1..];
 
     /// <summary>Godot node names disallow . : @ / %. Keep IDs/ASCII; replace the rest.</summary>
     private static string SanitizeName(string raw)
