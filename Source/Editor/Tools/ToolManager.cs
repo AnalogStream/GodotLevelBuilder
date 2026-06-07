@@ -39,6 +39,10 @@ public partial class ToolManager : Node
         var stairPlane = new StairPlaneDrawTool();
         var bankedCurve = new BankedCurveDrawTool();
         var halfPipe = new HalfPipeDrawTool();
+        var edgeCurb = new EdgeCurbDrawTool();
+        var cylinder = new CylinderDrawTool();
+        var curvedWall = new CurvedWallDrawTool();
+        var dome = new DomeDrawTool();
         var door = new OpeningTool(OpeningPreset.Door);
         var window = new OpeningTool(OpeningPreset.Window);
 
@@ -55,6 +59,10 @@ public partial class ToolManager : Node
             { Key.H, stairPlane },
             { Key.C, bankedCurve },
             { Key.U, halfPipe },
+            { Key.E, edgeCurb },
+            { Key.L, cylinder },
+            { Key.A, curvedWall },
+            { Key.O, dome },
         };
 
         _toolsById = new Dictionary<string, ITool>
@@ -67,13 +75,17 @@ public partial class ToolManager : Node
             { "stair_plane", stairPlane },
             { "banked_curve", bankedCurve },
             { "half_pipe", halfPipe },
+            { "edge_curb", edgeCurb },
+            { "cylinder", cylinder },
+            { "curved_wall", curvedWall },
+            { "dome", dome },
             { "door", door },
             { "window", window },
         };
         _idByTool = new Dictionary<ITool, string>();
         foreach (var (id, tool) in _toolsById) _idByTool[tool] = id;
 
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Activate a tool by its palette id (palette click). No-op if unknown.</summary>

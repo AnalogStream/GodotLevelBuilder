@@ -12,7 +12,8 @@ namespace LevelBuilder.Core.Primitives;
 /// mirrored across the path). It sweeps |<c>arc</c>| degrees at centreline <c>radius</c>, spanning
 /// <c>width</c> across the path. The cross-section can be <c>bank</c>ed (outer edge raised, rotated about
 /// the path tangent) and is a constant-<c>thickness</c> slab whose underside is offset straight down
-/// (−Y) — never self-intersects below a 90° bank, and the thickness variation is invisible.
+/// (−Y) — never self-intersects below a 90° bank, and the thickness variation is invisible. A non-zero
+/// <c>rise</c> lifts the centreline linearly along the sweep, turning the turn into a spiral/helix ramp.
 ///
 /// Built by stitching <c>segments</c> quad rings along the arc. Surfaces: 0 Surface (the walkable top),
 /// 1 Side (underside, inner + outer walls, and the two end caps). Winding mirrors RampPrimitive's
@@ -31,6 +32,7 @@ public sealed class BankedCurvePrimitive : IPrimitive
         new ParamSpec("arc",       "Arc (deg)", ParamType.Float, 90.0f, -270f,  270f),
         new ParamSpec("width",     "Width",     ParamType.Float, 2.0f,  0.1f,  100f),
         new ParamSpec("bank",      "Bank (deg)",ParamType.Float, 0.0f,  0f,    60f),
+        new ParamSpec("rise",      "Rise",      ParamType.Float, 0.0f,  0f,    200f),
         new ParamSpec("thickness", "Thickness", ParamType.Float, 0.2f,  0.05f, 10f),
         new ParamSpec("segments",  "Segments",  ParamType.Int,   16,    2f,    64f),
     };
@@ -43,6 +45,7 @@ public sealed class BankedCurvePrimitive : IPrimitive
         float arcDeg = GetF(data, "arc", 90f);
         float width = GetF(data, "width", 2f);
         float bankDeg = GetF(data, "bank", 0f);
+        float rise = GetF(data, "rise", 0f);
         float t = GetF(data, "thickness", 0.2f);
         int seg = Mathf.Max(2, GetI(data, "segments", 16));
 
@@ -70,7 +73,7 @@ public sealed class BankedCurvePrimitive : IPrimitive
             float s = Mathf.Sin(th), c = Mathf.Cos(th);
             // Centre of curvature at (0,0,−dir·R): centreline P(θ)=(R·sinθ, 0, dir·(R·cosθ−R)),
             // tangent (cosθ,0,−dir·sinθ). dir=+1 curves toward −Z, dir=−1 toward +Z (forward heading kept).
-            var p = new Vector3(radius * s, 0, dir * (radius * c - radius));
+            var p = new Vector3(radius * s, rise * i / seg, dir * (radius * c - radius));
             var radialOut = new Vector3(s, 0, dir * c);                 // away from centre (toward outer edge)
             var lateral = cosB * radialOut + sinB * Vector3.Up;          // banked across-path axis (outer raised)
             innerTop[i] = p - halfW * lateral;

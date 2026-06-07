@@ -53,6 +53,36 @@ public static class MeshBuilder
         AddVertex(st, b, normal, uvB);
     }
 
+    /// <summary>
+    /// Adds a quad, deriving the geometric normal from the corners and choosing the winding so the
+    /// front face points toward <paramref name="refNormal"/>. Use for radial/curved/frame surfaces where
+    /// hand-tracking CCW order is error-prone: pass the corners around the perimeter (either direction)
+    /// and a rough outward reference (e.g. Vector3.Up for a cap). Degenerate (zero-area) quads are skipped.
+    /// UVs are the planar dist-from-a mapping of the 5-arg <see cref="AddQuad(SurfaceTool,Vector3,Vector3,Vector3,Vector3,Vector3)"/>.
+    /// </summary>
+    public static void AddQuadFacing(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 refNormal)
+    {
+        Vector3 n = (b - a).Cross(c - a);
+        if (n.LengthSquared() < 1e-12f) return;
+        n = n.Normalized();
+        if (n.Dot(refNormal) >= 0) AddQuad(st, a, b, c, d, n);
+        else AddQuad(st, a, d, c, b, -n);
+    }
+
+    /// <summary>
+    /// As <see cref="AddQuadFacing"/> but a single triangle, with planar top-down UVs (metres from the
+    /// XZ projection) — fine for the near-horizontal cap fans of cylinders/domes. Degenerates skipped.
+    /// </summary>
+    public static void AddTriFacing(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 refNormal)
+    {
+        Vector3 n = (b - a).Cross(c - a);
+        if (n.LengthSquared() < 1e-12f) return;
+        n = n.Normalized();
+        Vector2 ua = new(a.X, a.Z), ub = new(b.X, b.Z), uc = new(c.X, c.Z);
+        if (n.Dot(refNormal) >= 0) AddTri(st, a, b, c, n, ua, ub, uc);
+        else AddTri(st, a, c, b, -n, ua, uc, ub);
+    }
+
     private static void AddVertex(SurfaceTool st, Vector3 p, Vector3 n, Vector2 uv)
     {
         st.SetNormal(n);

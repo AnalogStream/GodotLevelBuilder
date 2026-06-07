@@ -77,8 +77,9 @@ public static class InstanceHandleProvider
             {
                 float w = GetF(inst, "width", 2f), t = GetF(inst, "thickness", 0.2f);
                 float bank = GetF(inst, "bank", 0f), arcD = GetF(inst, "arc", 90f);
+                float radius = GetF(inst, "radius", 4f), rise = GetF(inst, "rise", 0f);
                 float dir = arcD >= 0 ? 1f : -1f;
-                float beta = Mathf.DegToRad(bank);
+                float beta = Mathf.DegToRad(bank), arcR = Mathf.Abs(Mathf.DegToRad(arcD));
                 // Entry cross-section: lateral runs across the path; +lateral is the outer (raised) edge.
                 var lateral = new Vector3(0, Mathf.Sin(beta), dir * Mathf.Cos(beta));
                 // Width grows symmetric about the centreline (origin fixed, shiftFactor 0) so the centreline
@@ -87,6 +88,50 @@ public static class InstanceHandleProvider
                 AddFace(handles, inst, prim, world, "width", -lateral * (w * 0.5f), -lateral, 0f);
                 // Thickness grows straight down from the fixed walkable top.
                 AddFace(handles, inst, prim, world, "thickness", new Vector3(0, -t, 0), new Vector3(0, -1, 0), 0f);
+                // Rise lifts the far end of the sweep (entry stays at y=0) — the helix climb.
+                var farCentre = new Vector3(radius * Mathf.Sin(arcR), rise, dir * (radius * Mathf.Cos(arcR) - radius));
+                AddFace(handles, inst, prim, world, "rise", farCentre + new Vector3(0, 0.3f, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
+            case "edge_curb":
+            {
+                float cw = GetF(inst, "width", 4f), cd = GetF(inst, "depth", 4f), rh = GetF(inst, "railHeight", 0.3f);
+                var midH = new Vector3(0, rh * 0.5f, 0);
+                AddCentered(handles, inst, prim, world, "width", new Vector3(1, 0, 0), cw * 0.5f, midH);
+                AddCentered(handles, inst, prim, world, "depth", new Vector3(0, 0, 1), cd * 0.5f, midH);
+                // Rail height grows up from the fixed base (y=0).
+                AddFace(handles, inst, prim, world, "railHeight", new Vector3(0, rh, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
+            case "cylinder":
+            {
+                float r = GetF(inst, "radius", 1f), ch = GetF(inst, "height", 3f);
+                var midH = new Vector3(0, ch * 0.5f, 0);
+                // Radius grows from the fixed axis (origin), shown on the +X and +Z rim; height grows up from y=0.
+                AddFace(handles, inst, prim, world, "radius", new Vector3(r, 0, 0) + midH, new Vector3(1, 0, 0), 0f);
+                AddFace(handles, inst, prim, world, "radius", new Vector3(0, 0, r) + midH, new Vector3(0, 0, 1), 0f);
+                AddFace(handles, inst, prim, world, "height", new Vector3(0, ch, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
+            case "curved_wall":
+            {
+                float wh = GetF(inst, "height", 1f), wt = GetF(inst, "thickness", 0.2f), warc = GetF(inst, "arc", 90f);
+                float wdir = warc >= 0 ? 1f : -1f;
+                var ro = new Vector3(0, 0, wdir);           // entry radial outward
+                var mid = new Vector3(0, wh * 0.5f, 0);
+                // Thickness grows symmetric about the centreline (both faces); height grows up from y=0.
+                AddFace(handles, inst, prim, world, "thickness", ro * (wt * 0.5f) + mid, ro, 0f);
+                AddFace(handles, inst, prim, world, "thickness", -ro * (wt * 0.5f) + mid, -ro, 0f);
+                AddFace(handles, inst, prim, world, "height", new Vector3(0, wh, 0), new Vector3(0, 1, 0), 0f);
+                break;
+            }
+            case "dome":
+            {
+                float dr = GetF(inst, "radius", 2f), dh = GetF(inst, "height", 2f);
+                // Radius grows from the fixed axis on the base ring; height grows up (apex / bowl rim).
+                AddFace(handles, inst, prim, world, "radius", new Vector3(dr, 0, 0), new Vector3(1, 0, 0), 0f);
+                AddFace(handles, inst, prim, world, "radius", new Vector3(0, 0, dr), new Vector3(0, 0, 1), 0f);
+                AddFace(handles, inst, prim, world, "height", new Vector3(0, dh, 0), new Vector3(0, 1, 0), 0f);
                 break;
             }
             case "half_pipe":
