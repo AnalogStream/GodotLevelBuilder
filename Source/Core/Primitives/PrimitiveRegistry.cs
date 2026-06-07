@@ -25,6 +25,7 @@ public sealed class PrimitiveRegistry
         registry.Register(new StairsPrimitive());
         registry.Register(new RampPlanePrimitive());
         registry.Register(new StairPlanePrimitive());
+        registry.Register(new BankedCurvePrimitive());
         return registry;
     }
 }

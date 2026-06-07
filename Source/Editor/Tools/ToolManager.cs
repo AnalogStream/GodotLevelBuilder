@@ -37,6 +37,7 @@ public partial class ToolManager : Node
         var stairs = new StairsDrawTool();
         var rampPlane = new RampPlaneDrawTool();
         var stairPlane = new StairPlaneDrawTool();
+        var bankedCurve = new BankedCurveDrawTool();
         var door = new OpeningTool(OpeningPreset.Door);
         var window = new OpeningTool(OpeningPreset.Window);
 
@@ -51,6 +52,7 @@ public partial class ToolManager : Node
             { Key.T, stairs },
             { Key.G, rampPlane },
             { Key.H, stairPlane },
+            { Key.C, bankedCurve },
         };
 
         _toolsById = new Dictionary<string, ITool>
@@ -61,13 +63,14 @@ public partial class ToolManager : Node
             { "stairs", stairs },
             { "ramp_plane", rampPlane },
             { "stair_plane", stairPlane },
+            { "banked_curve", bankedCurve },
             { "door", door },
             { "window", window },
         };
         _idByTool = new Dictionary<ITool, string>();
         foreach (var (id, tool) in _toolsById) _idByTool[tool] = id;
 
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Activate a tool by its palette id (palette click). No-op if unknown.</summary>
