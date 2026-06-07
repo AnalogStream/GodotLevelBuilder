@@ -73,6 +73,8 @@ public static class InstanceHandleProvider
                 AddFace(handles, inst, prim, world, "thickness", midH + down * t, down, 0f);
                 break;
             }
+            // half_pipe: a swept (curve + rise) channel — its far end isn't on local +X once curved, so
+            // there's no clean axis-drag handle; all dimensions are edited via the inspector (like banked_curve).
             case "stair_plane":
             {
                 float run = GetF(inst, "run", 3f), rise = GetF(inst, "totalRise", 3f), w = GetF(inst, "width", 1.2f), t = GetF(inst, "thickness", 0.1f);

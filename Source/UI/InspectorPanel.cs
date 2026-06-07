@@ -193,9 +193,19 @@ public partial class InspectorPanel : PanelContainer
 
     private void BuildInstanceRow(ParamSpec spec)
     {
+        if (spec.Type == ParamType.Bool)
+        {
+            var cb = new CheckBox { FocusMode = FocusModeEnum.None }; // don't let it swallow tool hotkeys
+            AddRow(spec.Label, cb);
+            ParamSpec b = spec; // capture per-iteration
+            cb.Toggled += on => OnInstanceBool(b, on);
+            _syncers.Add(() => cb.ButtonPressed = ReadInstanceBool(b));
+            return;
+        }
+
         if (spec.Type != ParamType.Float && spec.Type != ParamType.Int)
         {
-            // No editor for Bool/String yet (no primitive declares one) — show read-only.
+            // No editor for String yet (no primitive declares one) — show read-only.
             _propsBox.AddChild(new Label { Text = $"{spec.Label}: {ReadInstanceValue(spec)}" });
             return;
         }
@@ -227,6 +237,24 @@ public partial class InspectorPanel : PanelContainer
         PrimitiveInstanceData inst = _ctx.GetInstance(_ctx.SelectedId);
         if (inst != null && inst.Parameters.ContainsKey(spec.Key)) return inst.Parameters[spec.Key].AsDouble();
         return spec.Default.AsDouble();
+    }
+
+    private bool ReadInstanceBool(ParamSpec spec)
+    {
+        PrimitiveInstanceData inst = _ctx.GetInstance(_ctx.SelectedId);
+        if (inst != null && inst.Parameters.ContainsKey(spec.Key)) return inst.Parameters[spec.Key].AsBool();
+        return spec.Default.AsBool();
+    }
+
+    private void OnInstanceBool(ParamSpec spec, bool on)
+    {
+        if (_suppress) return;
+        PrimitiveInstanceData inst = _ctx.GetInstance(_ctx.SelectedId);
+        if (inst == null) return;
+
+        Variant from = inst.Parameters.ContainsKey(spec.Key) ? inst.Parameters[spec.Key] : spec.Default;
+        if (from.AsBool() == on) return; // no-op: don't log an empty undo
+        _ctx.Commands.Execute(new SetParameterCommand(inst, spec.Key, from, on, _ctx.Refresh));
     }
 
     // ---- opening rows ----------------------------------------------------
