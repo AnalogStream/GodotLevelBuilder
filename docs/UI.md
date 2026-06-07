@@ -63,10 +63,21 @@ id→`TreeItem` map, so drags don't thrash the tree or reset expand/collapse sta
 flag prevents the programmatic re-selection from echoing back as a user click.
 
 ### InspectorPanel (right)
-Properties of the selected object. Currently: identity (type + id) + a **Texture** slot
-(`TextureDropZone`) showing the current texture and accepting a dropped swatch. Subscribes to
-`EditorContext.Changed`. Parameter editing (width/height/… from `ParamSpec`) and per-slot texturing
-are the planned next steps.
+Properties of the selected object. Identity (type + id); a **Texture** slot (`TextureDropZone`)
+showing the current texture and accepting a dropped swatch; **texture properties** (Tiling +
+Tint) for the current texture; and the selection's editable parameters (the primitive's
+`ParamSpec`s, or an opening's offset/width/height/sill). Subscribes to `EditorContext.Changed`.
+
+- **Texture properties (Tiling/Tint)** are persistent controls under the texture slot, shown only
+  when the selection's primary slot points at a *texture* entry (a loaded `.material` has no editable
+  props here). They edit the shared `MaterialEntry` via `EditorContext.EditMaterial` →
+  `EditMaterialCommand` (undoable; affects every instance using that texture — see `DATA_MODEL.md`).
+  Synced under `_suppress` like the parameter rows; being persistent (not rebuilt per selection) they
+  avoid the QueueFree-inside-signal trap. Known minor: dragging the `ColorPickerButton` pushes one
+  undo step per change.
+- **Parameter rows** rebuild only when the selection *identity* changes (`_shownKey`); a same-selection
+  `Changed` (a field's own edit, or a live gizmo drag) just pushes values into the existing `SpinBox`es
+  via `_syncers`. All programmatic writes run under `_suppress` so they don't echo as new commands.
 
 ### PrimitivePalettePanel (bottom tab 1)
 Every registered primitive **plus** the two wall openings (door/window), grouped by category

@@ -27,6 +27,13 @@ public partial class LevelView : Node3D
         _registry = registry;
     }
 
+    /// <summary>
+    /// Drops a material's cached build so the next <see cref="Rebuild"/> re-resolves it. The resolver
+    /// here is long-lived (cached across rebuilds), so a property edit on its MaterialEntry wouldn't
+    /// show until the cache entry is evicted. Called when a texture's properties change.
+    /// </summary>
+    public void InvalidateMaterial(string id) => _materials.Invalidate(id);
+
     /// <summary>Stores the selection state; the caller drives the rebuild (see EditorContext.Refresh).</summary>
     public void SetSelection(string instanceId, string openingId)
     {
@@ -71,8 +78,12 @@ public partial class LevelView : Node3D
                 {
                     Mesh = mesh,
                     Transform = xform,
-                    // A selected (non-opening) instance overrides all surfaces with the highlight tint.
-                    MaterialOverride = (inst.Id == _selectedId && _selectedOpeningId == null) ? HighlightMaterial() : null,
+                    // A selected (non-opening) instance gets the highlight as a translucent OVERLAY (not an
+                    // override): the overlay composites on top of the real surface materials, so the object's
+                    // texture stays visible — tinted orange — instead of being hidden behind solid orange.
+                    // That matters because texture properties (tiling/tint) are edited while selected, so the
+                    // texture must show through for the change to be visible live.
+                    MaterialOverlay = (inst.Id == _selectedId && _selectedOpeningId == null) ? HighlightMaterial() : null,
                 });
 
                 AddChild(BuildPickBody(inst, prim, ctx, xform));
@@ -140,9 +151,11 @@ public partial class LevelView : Node3D
         return body;
     }
 
+    // Translucent so that, used as a MaterialOverlay, the underlying texture shows through the orange tint.
     private static StandardMaterial3D HighlightMaterial() => new()
     {
-        AlbedoColor = new Color(1.0f, 0.62f, 0.22f),
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        AlbedoColor = new Color(1.0f, 0.62f, 0.22f, 0.35f),
         EmissionEnabled = true,
         Emission = new Color(0.85f, 0.45f, 0.12f),
         EmissionEnergyMultiplier = 0.5f,

@@ -30,6 +30,12 @@ public sealed class MaterialResolver
         }
     }
 
+    /// <summary>Drops a material's cached build so the next Resolve rebuilds it (call after editing the entry).</summary>
+    public void Invalidate(string materialId)
+    {
+        if (!string.IsNullOrEmpty(materialId)) _cache.Remove(materialId);
+    }
+
     /// <summary>Library id -> Material (loaded from the entry's MaterialPath), cached. Null if unresolved.</summary>
     public Material Resolve(string materialId, MaterialLibrary library)
     {
@@ -54,7 +60,15 @@ public sealed class MaterialResolver
         if (!string.IsNullOrEmpty(entry.TexturePath))
         {
             Texture2D tex = TextureLoader.Load(entry.TexturePath); // imported, or raw-decoded if not yet reimported
-            return tex == null ? null : new StandardMaterial3D { AlbedoTexture = tex };
+            if (tex == null) return null;
+
+            float s = entry.UvScale <= 0 ? 1f : entry.UvScale;
+            return new StandardMaterial3D
+            {
+                AlbedoTexture = tex,
+                Uv1Scale = new Vector3(s, s, 1), // world-unit UVs → s = tiles per metre
+                AlbedoColor = entry.Tint,
+            };
         }
 
         return null;

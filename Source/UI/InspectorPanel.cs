@@ -28,6 +28,10 @@ public partial class InspectorPanel : PanelContainer
     private Label _title;
     private Label _details;
     private TextureDropZone _texture;
+    private HBoxContainer _tilingRow;
+    private SpinBox _tilingSpin;
+    private HBoxContainer _tintRow;
+    private ColorPickerButton _tintPicker;
     private Label _propsHeader;
     private VBoxContainer _propsBox;
 
@@ -69,6 +73,33 @@ public partial class InspectorPanel : PanelContainer
         body.AddChild(_texture);
         _texture.Setup(OnDropTexture, CanDropTexture);
 
+        // Per-texture render properties (shared across every instance using this texture). Shown only
+        // for texture-built entries; a loaded .material's settings live in its own resource. Synced in
+        // UpdateTextureProps under _suppress so programmatic writes don't echo as edits.
+        _tilingSpin = new SpinBox
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            // Godot snaps Range values to min + n*step, so the floor must be a multiple of step or
+            // round numbers (0.5, 1.0) become unreachable — with min 0.05/step 0.25 they snapped to
+            // 0.55/1.05. Floor 0.05 IS a multiple of step 0.05, so the grid is every 0.05.
+            MinValue = 0.05, MaxValue = 64, Step = 0.05, Value = 1,
+            TooltipText = "Texture tiling: tiles per metre (higher = smaller, more-repeated tiles).",
+        };
+        _tilingSpin.ValueChanged += OnTiling;
+        _tilingRow = MakeRow("Tiling", _tilingSpin);
+        body.AddChild(_tilingRow);
+
+        _tintPicker = new ColorPickerButton
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            CustomMinimumSize = new Vector2(0, 24),
+            FocusMode = FocusModeEnum.None, // don't let it swallow tool hotkeys
+            Color = Colors.White,
+        };
+        _tintPicker.ColorChanged += OnTint;
+        _tintRow = MakeRow("Tint", _tintPicker);
+        body.AddChild(_tintRow);
+
         body.AddChild(new HSeparator());
         _propsHeader = new Label { Text = "Properties", Modulate = new Color(1, 1, 1, 0.6f) };
         body.AddChild(_propsHeader);
@@ -106,6 +137,7 @@ public partial class InspectorPanel : PanelContainer
         }
         foreach (Action sync in _syncers) sync();
         UpdateIdentity();
+        UpdateTextureProps();
         _suppress = false;
     }
 
@@ -269,12 +301,62 @@ public partial class InspectorPanel : PanelContainer
         Rounded = isInt,
     };
 
-    private void AddRow(string label, Control field)
+    private void AddRow(string label, Control field) => _propsBox.AddChild(MakeRow(label, field));
+
+    private static HBoxContainer MakeRow(string label, Control field)
     {
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         row.AddChild(new Label { Text = label, CustomMinimumSize = new Vector2(80, 0) });
         row.AddChild(field);
-        _propsBox.AddChild(row);
+        return row;
+    }
+
+    // ---- texture properties ----------------------------------------------
+
+    /// <summary>The library entry of the selection's primary slot, or null (no selection / opening / unset slot).</summary>
+    private MaterialEntry CurrentEntry(out string id)
+    {
+        id = null;
+        if (_ctx.SelectedId == null || _ctx.SelectedOpeningId != null) return null;
+        PrimitiveInstanceData inst = _ctx.GetInstance(_ctx.SelectedId);
+        if (inst == null) return null;
+        IPrimitive prim = _ctx.Registry.Get(inst.PrimitiveType);
+        if (prim == null || prim.MaterialSlots.Count == 0) return null;
+        string slot = prim.MaterialSlots[0];
+        if (!inst.MaterialSlots.ContainsKey(slot)) return null;
+        id = inst.MaterialSlots[slot].AsString();
+        return _ctx.Document.Materials.Find(id);
+    }
+
+    /// <summary>Show + sync the tiling/tint controls for a texture entry; hide them otherwise.</summary>
+    private void UpdateTextureProps()
+    {
+        MaterialEntry entry = CurrentEntry(out _);
+        bool show = entry != null && !string.IsNullOrEmpty(entry.TexturePath);
+        _tilingRow.Visible = show;
+        _tintRow.Visible = show;
+        if (!show) return;
+
+        _tilingSpin.Value = entry.UvScale <= 0 ? 1 : entry.UvScale;
+        _tintPicker.Color = entry.Tint;
+    }
+
+    private void OnTiling(double v)
+    {
+        if (_suppress) return;
+        MaterialEntry entry = CurrentEntry(out string id);
+        if (entry == null) return;
+        if (Mathf.Abs(entry.UvScale - v) < 1e-9) return;
+        _ctx.EditMaterial(id, (float)v, entry.Tint);
+    }
+
+    private void OnTint(Color c)
+    {
+        if (_suppress) return;
+        MaterialEntry entry = CurrentEntry(out string id);
+        if (entry == null) return;
+        if (entry.Tint == c) return;
+        _ctx.EditMaterial(id, entry.UvScale, c);
     }
 
     // ---- texture (unchanged) ---------------------------------------------
@@ -292,8 +374,11 @@ public partial class InspectorPanel : PanelContainer
         MaterialEntry entry = _ctx.Document.Materials.Find(materialId);
         if (entry == null) return (null, materialId);
 
-        if (!string.IsNullOrEmpty(entry.TexturePath) && ResourceLoader.Exists(entry.TexturePath))
-            return (GD.Load<Texture2D>(entry.TexturePath), entry.DisplayName);
+        if (!string.IsNullOrEmpty(entry.TexturePath))
+        {
+            Texture2D t = TextureLoader.Load(entry.TexturePath); // raw-decode fallback, like the swatch
+            if (t != null) return (t, entry.DisplayName);
+        }
 
         return (null, entry.DisplayName); // a .material-based entry (e.g. a proto) — name only
     }

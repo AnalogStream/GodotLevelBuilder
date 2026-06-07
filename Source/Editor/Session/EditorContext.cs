@@ -177,6 +177,27 @@ public sealed class EditorContext
         Commands.Execute(new AssignMaterialCommand(inst, to, Refresh));
     }
 
+    /// <summary>
+    /// Edits a texture's shared render properties (tiling + tint). Affects every instance using this
+    /// texture (it's one library entry). Undoable; the resolver cache is busted so the view updates.
+    /// No-op if the entry is gone or nothing changed.
+    /// </summary>
+    public void EditMaterial(string materialId, float uvScale, Color tint)
+    {
+        MaterialEntry entry = Document.Materials.Find(materialId);
+        if (entry == null) return;
+
+        var from = new MaterialProps(entry.UvScale, entry.Tint);
+        var to = new MaterialProps(uvScale, tint);
+        if (from == to) return;
+
+        Commands.Execute(new EditMaterialCommand(entry, from, to, () =>
+        {
+            View.InvalidateMaterial(materialId); // long-lived resolver caches by id — evict before rebuild
+            Refresh();
+        }));
+    }
+
     public void Undo() => Commands.Undo();
     public void Redo() => Commands.Redo();
 

@@ -20,4 +20,15 @@ public partial class MaterialEntry : Resource
     /// StandardMaterial3D with this as its albedo — so picking a texture needs no on-disk .material file.
     /// </summary>
     [Export] public string TexturePath { get; set; } = "";
+
+    /// <summary>
+    /// Texture tiling: a multiplier on the (world-unit) UVs, so higher = the texture repeats more often
+    /// (smaller tiles). Applied only to texture-built materials (<see cref="TexturePath"/>), not loaded
+    /// .material files. Default 1. (Tiling needs the texture's wrap=repeat; imported textures default to
+    /// it — a just-added user texture may clamp until the editor reimports it. See docs/EXPORT.md.)
+    /// </summary>
+    [Export] public float UvScale { get; set; } = 1f;
+
+    /// <summary>Albedo tint multiplied onto a texture-built material. Default white (no change).</summary>
+    [Export] public Color Tint { get; set; } = Colors.White;
 }
