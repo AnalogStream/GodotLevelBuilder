@@ -117,7 +117,7 @@ public partial class Main : Node3D
         ctx.ReplaceDocument(doc);    // set the initial document BEFORE panels read ctx.Document in their Setup
         sceneTree.Setup(ctx);        // panels self-populate here and subscribe for later Changed events
         inspector.Setup(ctx);
-        viewportContainer.Setup(viewport, ctx.AssignTextureToInstance); // drop a swatch onto an object
+        viewportContainer.Setup(viewport, ctx.AssignTextureFromDrop); // drop a swatch onto an object (whole selection if it's part of one)
         tools.Setup(ctx);
         ctx.CancelActiveTool = tools.CancelActive; // so a document swap cancels a half-drawn primitive (and a height change)
 

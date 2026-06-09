@@ -44,21 +44,40 @@ public sealed class SelectTool : ITool
             return;
         }
 
-        if (!r.Hit) { _ctx.ClearSelection(); return; }
+        bool ctrl = Input.IsKeyPressed(Key.Ctrl);
+
+        if (!r.Hit) { if (!ctrl) _ctx.ClearSelection(); return; } // Ctrl+click on empty keeps the current set
 
         if (r.IsOpening)
         {
+            // Openings are single-select; Ctrl is ignored (multi-select is instances-only).
             _ctx.SelectOpening(r.InstanceId, r.OpeningId);
             PrimitiveInstanceData wall = _ctx.GetInstance(r.InstanceId);
             OpeningData opening = FindOpening(wall, r.OpeningId);
             if (opening != null) Begin(new OpeningMoveHandle(wall, opening, _ctx.SelectedInstanceOffset));
+            return;
         }
-        else
+
+        if (ctrl)
         {
-            _ctx.Select(r.InstanceId);
-            PrimitiveInstanceData inst = _ctx.GetInstance(r.InstanceId);
-            if (inst != null) Begin(new InstanceMoveHandle(inst, _ctx.Document.Grid.CellSize, _ctx.SelectedInstanceOffset.Y));
+            // Toggle this instance in/out of the multi-selection. No drag begins on a Ctrl-click.
+            _ctx.ToggleSelect(r.InstanceId);
+            return;
         }
+
+        // Plain click on an instance already in a multi-selection: keep the set, drag the whole group.
+        if (_ctx.SelectedIds.Count > 1 && _ctx.IsSelected(r.InstanceId))
+        {
+            var instances = _ctx.SelectedInstances();
+            if (instances.Count > 0)
+                Begin(new MultiMoveHandle(instances, _ctx.Document.Grid.CellSize, _ctx.SelectedInstanceOffset.Y));
+            return;
+        }
+
+        // Otherwise collapse to a single selection and move just it.
+        _ctx.Select(r.InstanceId);
+        PrimitiveInstanceData inst = _ctx.GetInstance(r.InstanceId);
+        if (inst != null) Begin(new InstanceMoveHandle(inst, _ctx.Document.Grid.CellSize, _ctx.SelectedInstanceOffset.Y));
     }
 
     public void UpdatePreview()

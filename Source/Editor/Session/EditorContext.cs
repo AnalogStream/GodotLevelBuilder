@@ -53,9 +53,29 @@ public sealed class EditorContext
     /// <summary>Disk path of the currently open level .tres, or "" if never saved/opened this document.</summary>
     public string CurrentLevelPath { get; private set; } = "";
 
-    public string SelectedId { get; private set; }
+    private readonly List<string> _selectedIds = new();
+    /// <summary>Every selected instance id (Ctrl+click adds/removes). The last entry is the primary.</summary>
+    public IReadOnlyList<string> SelectedIds => _selectedIds;
+    /// <summary>The primary (last-clicked) selection — drives the inspector + gizmos; null if nothing is
+    /// selected. When an opening is selected this is its owning wall.</summary>
+    public string SelectedId => _selectedIds.Count > 0 ? _selectedIds[^1] : null;
     /// <summary>Non-null when an opening is selected; <see cref="SelectedId"/> is then its owning wall.</summary>
     public string SelectedOpeningId { get; private set; }
+
+    /// <summary>True if <paramref name="id"/> is in the current multi-selection.</summary>
+    public bool IsSelected(string id) => _selectedIds.Contains(id);
+
+    /// <summary>The live instance data for every selected id (skips any that no longer exist).</summary>
+    public List<PrimitiveInstanceData> SelectedInstances()
+    {
+        var list = new List<PrimitiveInstanceData>();
+        foreach (string id in _selectedIds)
+        {
+            PrimitiveInstanceData inst = GetInstance(id);
+            if (inst != null) list.Add(inst);
+        }
+        return list;
+    }
 
     private IReadOnlyList<IEditHandle> _handles = new List<IEditHandle>();
     /// <summary>Resize handles for the current selection (indexed by the picker's HandleIndex).</summary>
@@ -77,7 +97,7 @@ public sealed class EditorContext
     /// </summary>
     public void Refresh()
     {
-        View.SetSelection(SelectedId, SelectedOpeningId);
+        View.SetSelection(_selectedIds, SelectedOpeningId);
         _handles = BuildHandles();
         View.Rebuild();
         Gizmos.Rebuild(_handles);
@@ -91,7 +111,8 @@ public sealed class EditorContext
             (PrimitiveInstanceData wall, OpeningData opening) = FindOpening(SelectedId, SelectedOpeningId);
             return OpeningHandleProvider.Build(wall, opening, OffsetOfInstance(SelectedId));
         }
-        if (SelectedId == null) return new List<IEditHandle>();
+        // Resize gizmos only make sense for a single instance — a multi-selection moves as a group (body drag).
+        if (_selectedIds.Count != 1) return new List<IEditHandle>();
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
         return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId));
@@ -215,6 +236,42 @@ public sealed class EditorContext
     }
 
     /// <summary>
+    /// Paints every material slot of every selected instance with <paramref name="texturePath"/> in one
+    /// undoable step. Each instance gets its own slot map (primitive types have different slot names).
+    /// No-op when nothing is selected or an opening is the selection (openings aren't textured yet).
+    /// </summary>
+    public void AssignTextureToSelection(string texturePath)
+    {
+        if (_selectedIds.Count == 0 || SelectedOpeningId != null) return;
+
+        // Register the texture once (append-only library, deliberately outside undo — see AssignTextureToInstance).
+        string materialId = TextureCatalog.EnsureEntry(Document.Materials, texturePath);
+
+        var children = new List<ICommand>();
+        foreach (string id in _selectedIds)
+        {
+            PrimitiveInstanceData inst = GetInstance(id);
+            IPrimitive prim = inst != null ? Registry.Get(inst.PrimitiveType) : null;
+            if (prim == null) continue;
+            var to = new Dictionary<string, string>();
+            foreach (string slot in prim.MaterialSlots) to[slot] = materialId;
+            children.Add(new AssignMaterialCommand(inst, to, () => { }));
+        }
+        if (children.Count == 0) return;
+        Commands.Execute(new MacroCommand($"Texture {children.Count} object(s)", children, Refresh));
+    }
+
+    /// <summary>
+    /// Texture drop from the viewport onto a specific object: if that object is part of a multi-selection,
+    /// paint the whole selection; otherwise just the dropped-on object.
+    /// </summary>
+    public void AssignTextureFromDrop(string instanceId, string texturePath)
+    {
+        if (_selectedIds.Count > 1 && IsSelected(instanceId)) AssignTextureToSelection(texturePath);
+        else AssignTextureToInstance(instanceId, texturePath);
+    }
+
+    /// <summary>
     /// Edits a texture's shared render properties (tiling + tint). Affects every instance using this
     /// texture (it's one library entry). Undoable; the resolver cache is busted so the view updates.
     /// No-op if the entry is gone or nothing changed.
@@ -260,23 +317,35 @@ public sealed class EditorContext
 
     public void Select(string id)
     {
-        SelectedId = id;
+        _selectedIds.Clear();
+        if (id != null) _selectedIds.Add(id);
         SelectedOpeningId = null;
+        Refresh();
+    }
+
+    /// <summary>Ctrl+click: add <paramref name="id"/> to the selection (as the new primary) if absent, else
+    /// remove it. Always drops any opening selection — multi-select is instances-only.</summary>
+    public void ToggleSelect(string id)
+    {
+        if (id == null) return;
+        SelectedOpeningId = null;
+        if (!_selectedIds.Remove(id)) _selectedIds.Add(id);
         Refresh();
     }
 
     /// <summary>Selects an opening: the wall is drawn intact and the opening shows as a solid placeholder.</summary>
     public void SelectOpening(string wallId, string openingId)
     {
-        SelectedId = wallId;
+        _selectedIds.Clear();
+        _selectedIds.Add(wallId);
         SelectedOpeningId = openingId;
         Refresh();
     }
 
     public void ClearSelection()
     {
-        if (SelectedId == null && SelectedOpeningId == null) return;
-        SelectedId = null;
+        if (_selectedIds.Count == 0 && SelectedOpeningId == null) return;
+        _selectedIds.Clear();
         SelectedOpeningId = null;
         Refresh();
     }
@@ -288,18 +357,31 @@ public sealed class EditorContext
             (PrimitiveInstanceData wall, OpeningData opening) = FindOpening(SelectedId, SelectedOpeningId);
             if (opening == null) { ClearSelection(); return; }
 
-            SelectedId = null;
+            _selectedIds.Clear();
             SelectedOpeningId = null; // command's refresh will rebuild without the placeholder
             Commands.Execute(new RemoveOpeningCommand(wall, opening, Refresh));
             return;
         }
 
-        if (SelectedId == null) return;
-        (StoreyData storey, PrimitiveInstanceData inst, int index) = Find(SelectedId);
-        if (inst == null) { ClearSelection(); return; }
+        if (_selectedIds.Count == 0) return;
 
-        SelectedId = null; // command's refresh will rebuild without the highlight
-        Commands.Execute(new RemoveInstanceCommand(storey, inst, index, Refresh));
+        // Snapshot the (storey, instance, index) of every selected id before dropping the selection.
+        var found = new List<(StoreyData storey, PrimitiveInstanceData inst, int index)>();
+        foreach (string id in _selectedIds)
+        {
+            (StoreyData s, PrimitiveInstanceData inst, int index) = Find(id);
+            if (inst != null) found.Add((s, inst, index));
+        }
+        _selectedIds.Clear(); // command's refresh will rebuild without the highlight
+        if (found.Count == 0) { Refresh(); return; }
+
+        // Descending index so the macro's reverse-order undo re-inserts ascending (original order preserved).
+        // Removal itself is by-reference (index-safe), so the descending order only matters for undo.
+        found.Sort((a, b) => b.index.CompareTo(a.index));
+        var children = new List<ICommand>(found.Count);
+        foreach ((StoreyData s, PrimitiveInstanceData inst, int index) in found)
+            children.Add(new RemoveInstanceCommand(s, inst, index, () => { }));
+        Commands.Execute(new MacroCommand($"Delete {children.Count} object(s)", children, Refresh));
     }
 
     private (PrimitiveInstanceData, OpeningData) FindOpening(string wallId, string openingId)
@@ -338,7 +420,7 @@ public sealed class EditorContext
             doc.Storeys.Add(new StoreyData { Id = Ids.New(), Name = "Ground Floor", BaseElevation = 0f, Height = 3f });
 
         Document = doc;
-        SelectedId = null;
+        _selectedIds.Clear();
         SelectedOpeningId = null;
         View.Setup(doc, Registry); // re-target + drop stale material cache; Rebuild (below) clears old meshes
         Commands.Clear();

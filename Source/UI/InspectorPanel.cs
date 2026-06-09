@@ -120,7 +120,7 @@ public partial class InspectorPanel : PanelContainer
 
     private void OnDropTexture(string texturePath)
     {
-        if (CanDropTexture()) _ctx.AssignTextureToInstance(_ctx.SelectedId, texturePath);
+        if (CanDropTexture()) _ctx.AssignTextureToSelection(texturePath);
     }
 
     // ---- refresh ---------------------------------------------------------

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using LevelBuilder.Core.Build;
 using LevelBuilder.Core.Data;
@@ -17,7 +18,7 @@ public partial class LevelView : Node3D
 {
     private LevelDocument _doc;
     private PrimitiveRegistry _registry;
-    private string _selectedId;
+    private readonly HashSet<string> _selectedIds = new();
     private string _selectedOpeningId;
     private readonly MaterialResolver _materials = new();
 
@@ -36,9 +37,10 @@ public partial class LevelView : Node3D
     public void InvalidateMaterial(string id) => _materials.Invalidate(id);
 
     /// <summary>Stores the selection state; the caller drives the rebuild (see EditorContext.Refresh).</summary>
-    public void SetSelection(string instanceId, string openingId)
+    public void SetSelection(IReadOnlyCollection<string> instanceIds, string openingId)
     {
-        _selectedId = instanceId;
+        _selectedIds.Clear();
+        foreach (string id in instanceIds) _selectedIds.Add(id);
         _selectedOpeningId = openingId;
     }
 
@@ -69,7 +71,7 @@ public partial class LevelView : Node3D
                 // show the opening as a solid placeholder — purely an edit-time view. The pick body
                 // below is still built from the unfiltered instance (holed collision), so the
                 // opening's pick box stays the sole occupant of the void. Bake/save never see this.
-                bool ownsSelectedOpening = inst.Id == _selectedId && _selectedOpeningId != null;
+                bool ownsSelectedOpening = _selectedOpeningId != null && _selectedIds.Contains(inst.Id);
                 PrimitiveInstanceData meshSource = ownsSelectedOpening ? WithoutOpening(inst, _selectedOpeningId) : inst;
 
                 ArrayMesh mesh = prim.BuildMesh(meshSource, ctx);
@@ -84,7 +86,7 @@ public partial class LevelView : Node3D
                     // texture stays visible — tinted orange — instead of being hidden behind solid orange.
                     // That matters because texture properties (tiling/tint) are edited while selected, so the
                     // texture must show through for the change to be visible live.
-                    MaterialOverlay = (inst.Id == _selectedId && _selectedOpeningId == null) ? HighlightMaterial() : null,
+                    MaterialOverlay = (_selectedOpeningId == null && _selectedIds.Contains(inst.Id)) ? HighlightMaterial() : null,
                 });
 
                 AddChild(BuildPickBody(inst, prim, ctx, xform));
@@ -114,7 +116,7 @@ public partial class LevelView : Node3D
             body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
             AddChild(body);
 
-            if (inst.Id == _selectedId && o.Id == _selectedOpeningId)
+            if (o.Id == _selectedOpeningId && _selectedIds.Contains(inst.Id))
                 AddChild(new MeshInstance3D
                 {
                     Mesh = MeshBuilder.Box(size),

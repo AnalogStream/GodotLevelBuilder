@@ -73,11 +73,11 @@ Parameters = {
 "thickness": 0.2
 }
 MaterialSlots = {
-"Back": "proto_wall",
-"Ends": "proto_trim",
-"Front": "proto_wall",
-"Reveal": "proto_trim",
-"Top": "proto_trim"
+"Back": "tex:textures/1K_Bricks.png",
+"Ends": "tex:textures/1K_Bricks.png",
+"Front": "tex:textures/1K_Bricks.png",
+"Reveal": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
 }
 
 [sub_resource type="Resource" id="Resource_jsbgp"]
@@ -91,11 +91,11 @@ Parameters = {
 "thickness": 0.2
 }
 MaterialSlots = {
-"Back": "proto_wall",
-"Ends": "proto_trim",
-"Front": "proto_wall",
-"Reveal": "proto_trim",
-"Top": "proto_trim"
+"Back": "tex:textures/1K_Bricks.png",
+"Ends": "tex:textures/1K_Bricks.png",
+"Front": "tex:textures/1K_Bricks.png",
+"Reveal": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
 }
 
 [sub_resource type="Resource" id="Resource_s1qkt"]
@@ -109,11 +109,11 @@ Parameters = {
 "thickness": 0.2
 }
 MaterialSlots = {
-"Back": "proto_wall",
-"Ends": "proto_trim",
-"Front": "proto_wall",
-"Reveal": "proto_trim",
-"Top": "proto_trim"
+"Back": "tex:textures/1K_Bricks.png",
+"Ends": "tex:textures/1K_Bricks.png",
+"Front": "tex:textures/1K_Bricks.png",
+"Reveal": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
 }
 
 [sub_resource type="Resource" id="Resource_633tr"]
@@ -127,11 +127,11 @@ Parameters = {
 "thickness": 0.2
 }
 MaterialSlots = {
-"Back": "proto_wall",
-"Ends": "proto_trim",
-"Front": "proto_wall",
-"Reveal": "proto_trim",
-"Top": "proto_trim"
+"Back": "tex:textures/1K_Bricks.png",
+"Ends": "tex:textures/1K_Bricks.png",
+"Front": "tex:textures/1K_Bricks.png",
+"Reveal": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
 }
 
 [sub_resource type="Resource" id="Resource_7rboh"]
@@ -145,18 +145,18 @@ Parameters = {
 "thickness": 0.2
 }
 MaterialSlots = {
-"Back": "proto_wall",
-"Ends": "proto_trim",
-"Front": "proto_wall",
-"Reveal": "proto_trim",
-"Top": "proto_trim"
+"Back": "tex:textures/1K_Bricks.png",
+"Ends": "tex:textures/1K_Bricks.png",
+"Front": "tex:textures/1K_Bricks.png",
+"Reveal": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
 }
 
 [sub_resource type="Resource" id="Resource_kq50x"]
 script = ExtResource("5_sb37i")
 Id = "854d3414"
 PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.5, 0, 0.5)
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 0, 0.5)
 Parameters = {
 "depth": 11.0,
 "thickness": 0.2,
@@ -178,7 +178,7 @@ Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_gg72i"), SubRes
 script = ExtResource("5_sb37i")
 Id = "a2ed4e03"
 PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 0, -6)
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.5, 0, -6)
 Parameters = {
 "depth": 14.0,
 "thickness": 0.2,
@@ -194,7 +194,7 @@ MaterialSlots = {
 script = ExtResource("5_sb37i")
 Id = "08ad1a6c"
 PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 0, 9.5)
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, 9.5)
 Parameters = {
 "depth": 9.0,
 "thickness": 0.2,
@@ -217,7 +217,7 @@ Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_dgrrb"), SubRes
 script = ExtResource("5_sb37i")
 Id = "cfce5dc6"
 PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.5, 0, -2)
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.5, 0, -2)
 Parameters = {
 "depth": 20.0,
 "thickness": 0.2,
