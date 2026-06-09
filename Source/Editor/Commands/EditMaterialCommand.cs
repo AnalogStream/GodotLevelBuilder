@@ -5,7 +5,7 @@ using LevelBuilder.Core.Data;
 namespace LevelBuilder.Editor.Commands;
 
 /// <summary>The editable, per-texture render properties of a <see cref="MaterialEntry"/>.</summary>
-public readonly record struct MaterialProps(float UvScale, Color Tint);
+public readonly record struct MaterialProps(float UvScale, Color Tint, bool Pixelated, int PixelSize);
 
 /// <summary>
 /// Edits a texture's shared properties (tiling + tint) on its <see cref="MaterialEntry"/>. Because a
@@ -36,5 +36,7 @@ public sealed class EditMaterialCommand : ICommand
     {
         _entry.UvScale = p.UvScale;
         _entry.Tint = p.Tint;
+        _entry.Pixelated = p.Pixelated;
+        _entry.PixelSize = p.PixelSize;
     }
 }

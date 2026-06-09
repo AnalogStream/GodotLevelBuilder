@@ -32,6 +32,10 @@ public partial class InspectorPanel : PanelContainer
     private SpinBox _tilingSpin;
     private HBoxContainer _tintRow;
     private ColorPickerButton _tintPicker;
+    private HBoxContainer _pixelRow;
+    private CheckBox _pixelCheck;
+    private HBoxContainer _pixelSizeRow;
+    private SpinBox _pixelSizeSpin;
     private Label _propsHeader;
     private VBoxContainer _propsBox;
 
@@ -99,6 +103,27 @@ public partial class InspectorPanel : PanelContainer
         _tintPicker.ColorChanged += OnTint;
         _tintRow = MakeRow("Tint", _tintPicker);
         body.AddChild(_tintRow);
+
+        // Pixelate: downsample the texture + nearest-filter it for a chunky pixel-art look. The size
+        // spinner (longest side, in texels) only shows while the toggle is on.
+        _pixelCheck = new CheckBox
+        {
+            FocusMode = FocusModeEnum.None, // don't let it swallow tool hotkeys
+            TooltipText = "Downsample this texture and show it with hard pixels (match a low-fi artstyle).",
+        };
+        _pixelCheck.Toggled += OnPixelated;
+        _pixelRow = MakeRow("Pixelate", _pixelCheck);
+        body.AddChild(_pixelRow);
+
+        _pixelSizeSpin = new SpinBox
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            MinValue = 4, MaxValue = 256, Step = 1, Value = 32, Rounded = true,
+            TooltipText = "Pixelation resolution: the texture's longest side in texels (lower = chunkier).",
+        };
+        _pixelSizeSpin.ValueChanged += OnPixelSize;
+        _pixelSizeRow = MakeRow("Pixels", _pixelSizeSpin);
+        body.AddChild(_pixelSizeRow);
 
         body.AddChild(new HSeparator());
         _propsHeader = new Label { Text = "Properties", Modulate = new Color(1, 1, 1, 0.6f) };
@@ -363,10 +388,14 @@ public partial class InspectorPanel : PanelContainer
         bool show = entry != null && !string.IsNullOrEmpty(entry.TexturePath);
         _tilingRow.Visible = show;
         _tintRow.Visible = show;
+        _pixelRow.Visible = show;
+        _pixelSizeRow.Visible = show && entry.Pixelated; // size only matters while pixelation is on
         if (!show) return;
 
         _tilingSpin.Value = entry.UvScale <= 0 ? 1 : entry.UvScale;
         _tintPicker.Color = entry.Tint;
+        _pixelCheck.ButtonPressed = entry.Pixelated;
+        _pixelSizeSpin.Value = entry.PixelSize <= 0 ? 32 : entry.PixelSize;
     }
 
     private void OnTiling(double v)
@@ -375,7 +404,7 @@ public partial class InspectorPanel : PanelContainer
         MaterialEntry entry = CurrentEntry(out string id);
         if (entry == null) return;
         if (Mathf.Abs(entry.UvScale - v) < 1e-9) return;
-        _ctx.EditMaterial(id, (float)v, entry.Tint);
+        _ctx.EditMaterial(id, (float)v, entry.Tint, entry.Pixelated, entry.PixelSize);
     }
 
     private void OnTint(Color c)
@@ -384,7 +413,26 @@ public partial class InspectorPanel : PanelContainer
         MaterialEntry entry = CurrentEntry(out string id);
         if (entry == null) return;
         if (entry.Tint == c) return;
-        _ctx.EditMaterial(id, entry.UvScale, c);
+        _ctx.EditMaterial(id, entry.UvScale, c, entry.Pixelated, entry.PixelSize);
+    }
+
+    private void OnPixelated(bool on)
+    {
+        if (_suppress) return;
+        MaterialEntry entry = CurrentEntry(out string id);
+        if (entry == null) return;
+        if (entry.Pixelated == on) return;
+        _ctx.EditMaterial(id, entry.UvScale, entry.Tint, on, entry.PixelSize);
+    }
+
+    private void OnPixelSize(double v)
+    {
+        if (_suppress) return;
+        MaterialEntry entry = CurrentEntry(out string id);
+        if (entry == null) return;
+        int px = (int)v;
+        if (entry.PixelSize == px) return;
+        _ctx.EditMaterial(id, entry.UvScale, entry.Tint, entry.Pixelated, px);
     }
 
     // ---- texture (unchanged) ---------------------------------------------

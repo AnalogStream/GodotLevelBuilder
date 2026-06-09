@@ -31,4 +31,17 @@ public partial class MaterialEntry : Resource
 
     /// <summary>Albedo tint multiplied onto a texture-built material. Default white (no change).</summary>
     [Export] public Color Tint { get; set; } = Colors.White;
+
+    /// <summary>
+    /// When true the texture is downsampled to <see cref="PixelSize"/> texels and shown with a Nearest
+    /// filter — a chunky pixel-art look (e.g. a photographic grass texture matched to a low-fi artstyle).
+    /// Applied only to texture-built materials, like tiling/tint. Default off (full-res, smooth filtering).
+    /// </summary>
+    [Export] public bool Pixelated { get; set; } = false;
+
+    /// <summary>
+    /// Pixelation resolution: the texture's longest side in texels when <see cref="Pixelated"/> is on
+    /// (aspect preserved; lower = chunkier pixels). Default 32.
+    /// </summary>
+    [Export] public int PixelSize { get; set; } = 32;
 }

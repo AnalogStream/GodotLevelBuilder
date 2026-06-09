@@ -272,17 +272,17 @@ public sealed class EditorContext
     }
 
     /// <summary>
-    /// Edits a texture's shared render properties (tiling + tint). Affects every instance using this
-    /// texture (it's one library entry). Undoable; the resolver cache is busted so the view updates.
+    /// Edits a texture's shared render properties (tiling, tint, pixelation). Affects every instance using
+    /// this texture (it's one library entry). Undoable; the resolver cache is busted so the view updates.
     /// No-op if the entry is gone or nothing changed.
     /// </summary>
-    public void EditMaterial(string materialId, float uvScale, Color tint)
+    public void EditMaterial(string materialId, float uvScale, Color tint, bool pixelated, int pixelSize)
     {
         MaterialEntry entry = Document.Materials.Find(materialId);
         if (entry == null) return;
 
-        var from = new MaterialProps(entry.UvScale, entry.Tint);
-        var to = new MaterialProps(uvScale, tint);
+        var from = new MaterialProps(entry.UvScale, entry.Tint, entry.Pixelated, entry.PixelSize);
+        var to = new MaterialProps(uvScale, tint, pixelated, pixelSize);
         if (from == to) return;
 
         Commands.Execute(new EditMaterialCommand(entry, from, to, () =>

@@ -132,14 +132,55 @@ public sealed class MaterialResolver
             if (tex == null) return null;
 
             float s = entry.UvScale <= 0 ? 1f : entry.UvScale;
-            return new StandardMaterial3D
+            var mat = new StandardMaterial3D
             {
                 AlbedoTexture = tex,
                 Uv1Scale = new Vector3(s, s, 1), // world-unit UVs → s = tiles per metre
                 AlbedoColor = entry.Tint,
             };
+
+            if (entry.Pixelated)
+            {
+                Texture2D pix = Pixelate(tex, entry.PixelSize);
+                if (pix != null)
+                {
+                    mat.AlbedoTexture = pix;
+                    // Nearest so the few remaining texels read as crisp blocks, not smoothed back to mush.
+                    mat.TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest;
+                }
+            }
+
+            return mat;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// A low-resolution copy of <paramref name="tex"/>: its longest side scaled down to
+    /// <paramref name="targetPx"/> texels (aspect preserved), to be displayed with a Nearest filter.
+    /// The downscale uses bilinear AVERAGING (not point sampling) so detail collapses into clean flat
+    /// blocks — point-sampling the downscale would just subsample and keep the source noise. Only ever
+    /// downscales (a texture already smaller than the target is left alone). Returns null if unreadable.
+    /// </summary>
+    private static Texture2D Pixelate(Texture2D tex, int targetPx)
+    {
+        Image img = tex.GetImage();
+        if (img == null) return null;
+        img = (Image)img.Duplicate(); // never mutate an image shared with TextureLoader's cached texture
+        if (img.IsCompressed()) img.Decompress(); // Resize no-ops on a VRAM-compressed image
+
+        int w = img.GetWidth(), h = img.GetHeight();
+        if (w <= 0 || h <= 0) return null;
+
+        int target = Mathf.Clamp(targetPx <= 0 ? 32 : targetPx, 1, 4096);
+        int longest = Mathf.Max(w, h);
+        if (target < longest) // upscaling a small texture wouldn't pixelate it — only shrink
+        {
+            float k = (float)target / longest;
+            img.Resize(Mathf.Max(1, Mathf.RoundToInt(w * k)), Mathf.Max(1, Mathf.RoundToInt(h * k)),
+                Image.Interpolation.Bilinear);
+        }
+        return ImageTexture.CreateFromImage(img);
     }
 }
