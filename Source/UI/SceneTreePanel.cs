@@ -28,6 +28,7 @@ public partial class SceneTreePanel : PanelContainer
     private string _structureSig = "";
     private bool _suppressSignal;
     private bool _rebuildQueued;
+    private bool _syncQueued;
     private readonly Dictionary<string, TreeItem> _itemsByKey = new();
 
     private static readonly Color ActiveStoreyColor = new(0.55f, 0.80f, 1.0f);
@@ -46,12 +47,15 @@ public partial class SceneTreePanel : PanelContainer
         _tree = new Tree
         {
             HideRoot = true,
-            SelectMode = Tree.SelectModeEnum.Single,
+            // Multi lets the Tree handle Ctrl-toggle + Shift-range natively and render several rows
+            // highlighted at once; we translate its selection into the editor model (instances only).
+            SelectMode = Tree.SelectModeEnum.Multi,
             FocusMode = FocusModeEnum.None, // keep the tree's type-ahead from eating tool hotkeys
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
-        _tree.ItemSelected += OnItemSelected;
+        _tree.MultiSelected += OnMultiSelected;
+        _tree.NothingSelected += OnNothingSelected;
         vbox.AddChild(_tree);
 
         _ctx.Changed += OnDocumentChanged;
@@ -114,47 +118,104 @@ public partial class SceneTreePanel : PanelContainer
         return item;
     }
 
-    /// <summary>Mirror the editor's current selection into the tree without re-triggering selection.</summary>
+    /// <summary>
+    /// Mirror the editor's current selection into the tree (model → highlight). In Multi mode several
+    /// rows can show selected at once: every selected instance is highlighted; an opening selection
+    /// highlights its single row. Wrapped in <see cref="_suppressSignal"/> so our own Select/Deselect
+    /// calls don't echo back through <see cref="OnMultiSelected"/>.
+    /// </summary>
     private void SyncSelection()
     {
-        string key = _ctx.SelectedOpeningId != null ? $"o|{_ctx.SelectedId}|{_ctx.SelectedOpeningId}"
-                   : _ctx.SelectedId != null ? $"i|{_ctx.SelectedId}"
-                   : null;
+        // The model's desired selected-row keys (in primary-last order).
+        var desired = new List<string>();
+        if (_ctx.SelectedOpeningId != null)
+            desired.Add($"o|{_ctx.SelectedId}|{_ctx.SelectedOpeningId}");
+        else
+            foreach (string id in _ctx.SelectedIds) desired.Add($"i|{id}");
+
+        // Skip when the tree already matches the model. This is load-bearing, not just an optimization:
+        // an unconditional DeselectAll/Select moves the Tree's native Shift-range *anchor* to the last
+        // re-selected row, which would break extending a range. It also avoids per-drag-frame churn and
+        // bounds any selection-signal feedback (after a real change, tree==model, so the next sync skips).
+        if (SelectionMatches(desired)) return;
 
         _suppressSignal = true;
-        if (key != null && _itemsByKey.TryGetValue(key, out TreeItem item))
-        {
-            item.Select(0);
-            _tree.ScrollToItem(item);
-        }
-        else
-        {
-            _tree.DeselectAll();
-        }
+        _tree.DeselectAll();
+        TreeItem scrollTo = null;
+        foreach (string key in desired)
+            if (_itemsByKey.TryGetValue(key, out TreeItem item))
+            {
+                item.Select(0);
+                scrollTo = item; // last one wins → scroll to the primary
+            }
+        if (scrollTo != null) _tree.ScrollToItem(scrollTo);
         _suppressSignal = false;
+    }
+
+    /// <summary>True if the Tree's currently-selected rows are exactly <paramref name="desired"/> (as a set).</summary>
+    private bool SelectionMatches(List<string> desired)
+    {
+        int count = 0;
+        for (TreeItem it = _tree.GetNextSelected(null); it != null; it = _tree.GetNextSelected(it))
+        {
+            if (!desired.Contains(it.GetMetadata(0).AsString())) return false;
+            count++;
+        }
+        return count == desired.Count;
     }
 
     // ---- input -----------------------------------------------------------
 
-    private void OnItemSelected()
-    {
-        if (_suppressSignal) return;
-        TreeItem item = _tree.GetSelected();
-        if (item == null) return;
+    // The Tree fires MultiSelected once per affected row (a Shift-range fires several). Rather than
+    // react to each, defer one read of the *whole* selection so the model is set from the final state.
+    private void OnMultiSelected(TreeItem item, long column, bool selected) => QueueTreeSync();
+    private void OnNothingSelected() => QueueTreeSync();
 
-        string[] parts = item.GetMetadata(0).AsString().Split('|');
-        switch (parts[0])
+    private void QueueTreeSync()
+    {
+        if (_suppressSignal || _syncQueued) return;
+        _syncQueued = true;
+        Callable.From(() => { _syncQueued = false; SyncFromTree(); }).CallDeferred();
+    }
+
+    /// <summary>
+    /// Translate the Tree's native multi-selection into the editor model (tree → model). Instances win:
+    /// any selected instance rows become the multi-selection (storey/opening rows in the same range are
+    /// ignored). With no instances, a single opening or storey row drives its single-select / activate.
+    /// </summary>
+    private void SyncFromTree()
+    {
+        var instanceIds = new List<string>();
+        string[] firstOpening = null;
+        string firstStorey = null;
+
+        for (TreeItem it = _tree.GetNextSelected(null); it != null; it = _tree.GetNextSelected(it))
         {
-            case "s":
-                StoreyData storey = FindStorey(parts[1]);
-                if (storey != null) _ctx.SetActiveStorey(storey);
-                break;
-            case "i":
-                _ctx.Select(parts[1]);
-                break;
-            case "o":
-                _ctx.SelectOpening(parts[1], parts[2]);
-                break;
+            string[] parts = it.GetMetadata(0).AsString().Split('|');
+            switch (parts[0])
+            {
+                case "i": instanceIds.Add(parts[1]); break;
+                case "o": firstOpening ??= parts; break;
+                case "s": firstStorey ??= parts[1]; break;
+            }
+        }
+
+        if (instanceIds.Count > 0)
+        {
+            _ctx.SelectMany(instanceIds); // Refresh → SyncSelection normalizes the tree (drops stray storey/opening rows)
+        }
+        else if (firstOpening != null)
+        {
+            _ctx.SelectOpening(firstOpening[1], firstOpening[2]);
+        }
+        else if (firstStorey != null)
+        {
+            StoreyData storey = FindStorey(firstStorey);
+            if (storey != null) _ctx.SetActiveStorey(storey);
+        }
+        else
+        {
+            _ctx.ClearSelection();
         }
     }
 

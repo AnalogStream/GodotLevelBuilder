@@ -323,6 +323,17 @@ public sealed class EditorContext
         Refresh();
     }
 
+    /// <summary>Replaces the selection with exactly <paramref name="ids"/> (order preserved, last = primary).
+    /// Used by the scene tree, where the whole selected set is read at once. Drops any opening selection.</summary>
+    public void SelectMany(IReadOnlyList<string> ids)
+    {
+        _selectedIds.Clear();
+        foreach (string id in ids)
+            if (id != null && !_selectedIds.Contains(id)) _selectedIds.Add(id);
+        SelectedOpeningId = null;
+        Refresh();
+    }
+
     /// <summary>Ctrl+click: add <paramref name="id"/> to the selection (as the new primary) if absent, else
     /// remove it. Always drops any opening selection — multi-select is instances-only.</summary>
     public void ToggleSelect(string id)
