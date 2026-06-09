@@ -77,6 +77,38 @@ Re-baking **overwrites** the target `.tscn`. Because:
 
 the consumer's material overrides, transforms, and added child nodes on the *instance* survive the rebake. Editing the baked `.tscn`'s contents directly (not via instancing) is not supported — those edits are lost on rebake. Document this for whoever consumes the levels.
 
+## Merged "chunk" bake (separate export)
+
+Alongside the per-instance `Bake` above, `SceneBaker.BakeMerged` produces a **single merged
+chunk** for assembling maps cheaply — written to `<Name>_merged.tscn` (a *separate* file; it does
+not overwrite the per-instance bake). Triggered from the **Project** tab ("Bake Merged Chunk").
+
+```
+<LevelName> (Node3D)
+├─ Mesh_<materialId>   (MeshInstance3D)   ← ALL geometry across ALL storeys, merged by material
+├─ Mesh_<materialId2>  (MeshInstance3D)
+└─ Collision (StaticBody3D)
+   └─ Trimesh (CollisionShape3D, one ConcavePolygonShape3D over the whole chunk)
+```
+
+- **Storeys are flattened** — `BaseElevation` is baked into each instance transform, so there are
+  no per-storey nodes. The whole level is one chunk.
+- **Merge by material** via `SurfaceTool.AppendFrom(mesh, surface, worldTransform)`, one
+  `SurfaceTool` per resolved material id, committed to one `MeshInstance3D` named
+  `Mesh_<materialId>` (id sanitized for node-name rules). Material on the surface, override free —
+  same rule as above, but keyed **per material**, not per instance. Draw calls ≈ number of
+  distinct materials.
+- **Do not regenerate normals/tangents** after `AppendFrom` — the primitives use deliberate flat
+  per-quad normals; `AppendFrom` already transforms them. Regenerating would smooth-shade the lot.
+- **Collision is one precise trimesh** (`ConcavePolygonShape3D` from the merged `GetFaces()`).
+  Trimesh (not convex) is required: it preserves the concavity of half-pipes/bowls/domes (the ball
+  rolls *inside*) and keeps wall openings as real holes. Cost: tri-count scales with high-segment
+  curves — fine for a handful of chunks.
+
+**Trade-off:** merging collapses per-*instance* overrides into per-*material*. Two walls sharing a
+texture can no longer be overridden separately in-game. That's inherent to the chunk approach — use
+the per-instance `Bake` when you need per-object override granularity.
+
 ## Export target
 
 The builder exports into a chosen folder (typically `res://levels/` of the game project). Both artifacts may be written: `.tres` kept with the builder's projects, `.tscn` written to the game. The export dialog records the last target per level so re-bake is one click.

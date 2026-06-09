@@ -305,6 +305,17 @@ public sealed class EditorContext
         Report("bake", path, e);
     }
 
+    /// <summary>Bakes a single merged "chunk" .tscn: geometry merged by material (one MeshInstance3D
+    /// per material) + one precise trimesh collision. Fewest draw calls; for assembling maps from
+    /// chunks. Separate output (<c>_merged.tscn</c>) — does not overwrite the per-instance bake.</summary>
+    public void BakeMergedToGodot()
+    {
+        EnsureDir(BakedDir);
+        string path = $"{BakedDir}/{FileStem()}_merged.tscn";
+        Error e = new SceneBaker(Registry).BakeMergedToFile(Document, path);
+        Report("bake merged", path, e);
+    }
+
     private string FileStem()
     {
         string raw = string.IsNullOrWhiteSpace(Document.Name) ? "Untitled" : Document.Name;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using LevelBuilder.Core.Data;
@@ -11,8 +12,12 @@ namespace LevelBuilder.Core.Build;
 /// rebake. Library materials are written onto the mesh SURFACE, leaving
 /// surface_material_override free for the consuming game. See docs/EXPORT.md.
 ///
-/// Milestone 1 keeps one MeshInstance3D per primitive instance; merge-by-material
-/// is a later optimisation (docs/ROADMAP.md M7).
+/// Two outputs:
+///   <see cref="Bake"/>       — one MeshInstance3D per primitive instance (Wall_&lt;id&gt;…),
+///                              inspectable, per-instance material overrides.
+///   <see cref="BakeMerged"/> — geometry merged by material into one MeshInstance3D each
+///                              (Mesh_&lt;materialId&gt;) + one precise trimesh body: the
+///                              fewest-draw-calls "chunk" export.
 /// </summary>
 public sealed class SceneBaker
 {
@@ -95,6 +100,118 @@ public sealed class SceneBaker
     public Error BakeToFile(LevelDocument doc, string path)
     {
         Node3D root = Bake(doc);
+        SetOwnerRecursive(root, root);
+
+        var packed = new PackedScene();
+        Error packErr = packed.Pack(root);
+        if (packErr != Error.Ok)
+        {
+            root.QueueFree();
+            return packErr;
+        }
+
+        Error saveErr = ResourceSaver.Save(packed, path);
+        root.QueueFree();
+        return saveErr;
+    }
+
+    /// <summary>
+    /// Bakes a single merged "chunk": all geometry across every storey is flattened and
+    /// grouped BY MATERIAL into one <see cref="MeshInstance3D"/> per material (named
+    /// <c>Mesh_&lt;materialId&gt;</c> per docs/EXPORT.md), cutting draw calls to one-per-material.
+    /// One precise trimesh (<see cref="ConcavePolygonShape3D"/>) built from the merged visual
+    /// geometry gives exact concave collision (the ball rolls inside half-pipes/bowls, openings
+    /// stay as real holes) under a single StaticBody3D.
+    ///
+    /// This is a SEPARATE output from <see cref="Bake"/> (per-instance). The trade-off: merging
+    /// collapses per-INSTANCE material overrides into per-MATERIAL — two walls sharing a texture
+    /// can no longer be overridden separately in-game. That's the cost of the chunk approach.
+    /// Caller owns the returned root.
+    /// </summary>
+    public Node3D BakeMerged(LevelDocument doc)
+    {
+        var materials = new MaterialResolver();
+        var root = new Node3D { Name = SanitizeName(doc.Name) };
+
+        // Accumulate every surface, transformed into level-local space, into one SurfaceTool per
+        // material id. "" = surfaces with no resolved material (kept as a default-grey group).
+        var groups = new Dictionary<string, SurfaceTool>();
+
+        foreach (StoreyData storey in doc.Storeys)
+        {
+            var ctx = new BuildContext
+            {
+                Materials = doc.Materials,
+                CellSize = doc.Grid.CellSize,
+                StoreyHeight = storey.Height,
+            };
+            // Storeys are flattened: bake the storey elevation into each instance transform.
+            var storeyXform = new Transform3D(Basis.Identity, new Vector3(0, storey.BaseElevation, 0));
+
+            foreach (PrimitiveInstanceData inst in storey.Instances.OrderBy(i => i.Id))
+            {
+                IPrimitive prim = _registry.Get(inst.PrimitiveType);
+                if (prim == null)
+                {
+                    GD.PushWarning($"SceneBaker: unknown primitive '{inst.PrimitiveType}' (instance {inst.Id}) — skipped.");
+                    continue;
+                }
+
+                ArrayMesh mesh = prim.BuildMesh(inst, ctx);
+                Transform3D world = storeyXform * inst.LocalTransform;
+
+                int surfaces = mesh.GetSurfaceCount();
+                for (int i = 0; i < surfaces && i < prim.MaterialSlots.Count; i++)
+                {
+                    string slot = prim.MaterialSlots[i];
+                    string matId = inst.MaterialSlots.TryGetValue(slot, out Variant v) ? v.AsString() : "";
+
+                    if (!groups.TryGetValue(matId, out SurfaceTool st))
+                    {
+                        st = new SurfaceTool();
+                        st.Begin(Mesh.PrimitiveType.Triangles);
+                        groups[matId] = st;
+                    }
+                    // AppendFrom transforms positions AND normals/tangents by the basis, so the
+                    // primitives' deliberate flat per-quad normals arrive correct. Do NOT call
+                    // GenerateNormals/Tangents after — that would smooth-shade everything.
+                    st.AppendFrom(mesh, i, world);
+                }
+            }
+        }
+
+        // Emit one MeshInstance3D per material (deterministic order), collecting collision faces.
+        var collisionFaces = new List<Vector3>();
+        foreach (KeyValuePair<string, SurfaceTool> kv in groups.OrderBy(g => g.Key))
+        {
+            ArrayMesh merged = kv.Value.Commit();
+            if (merged.GetSurfaceCount() == 0) continue;
+
+            Material mat = materials.Resolve(kv.Key, doc.Materials);
+            if (mat != null) merged.SurfaceSetMaterial(0, mat); // on the SURFACE, override stays free
+
+            string name = string.IsNullOrEmpty(kv.Key) ? "Mesh_nomat" : $"Mesh_{SanitizeName(kv.Key)}";
+            root.AddChild(new MeshInstance3D { Name = name, Mesh = merged });
+
+            // GetFaces returns level-local triangle verts (the transform is already baked in).
+            collisionFaces.AddRange(merged.GetFaces());
+        }
+
+        if (collisionFaces.Count > 0)
+        {
+            var body = new StaticBody3D { Name = "Collision" };
+            var shape = new ConcavePolygonShape3D { Data = collisionFaces.ToArray() };
+            body.AddChild(new CollisionShape3D { Name = "Trimesh", Shape = shape });
+            root.AddChild(body);
+        }
+
+        return root;
+    }
+
+    /// <summary>Merge-bakes and writes a .tscn to <paramref name="path"/>. Returns the save Error.</summary>
+    public Error BakeMergedToFile(LevelDocument doc, string path)
+    {
+        Node3D root = BakeMerged(doc);
         SetOwnerRecursive(root, root);
 
         var packed = new PackedScene();

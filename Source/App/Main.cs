@@ -81,12 +81,14 @@ public partial class Main : Node3D
         split.AddChild(sceneTree);  // left dock
         split.AddChild(rightSplit); // viewport + inspector
 
-        // Bottom dock: tabbed — primitive palette + texture library.
+        // Bottom dock: tabbed — primitive palette + texture library + project actions.
         var palette = new PrimitivePalettePanel { Name = "Primitives" };
         var textures = new TexturePalettePanel { Name = "Textures" };
+        var project = new ProjectPanel { Name = "Project" };
         var bottomTabs = new TabContainer { CustomMinimumSize = new Vector2(0, 180) };
         bottomTabs.AddChild(palette);
         bottomTabs.AddChild(textures);
+        bottomTabs.AddChild(project);
 
         var outer = new VSplitContainer();
         outer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -113,6 +115,7 @@ public partial class Main : Node3D
         tools.Setup(ctx);
         palette.Setup(registry, tools); // after tools.Setup so the primitive->tool map exists
         textures.Setup();
+        project.Setup(ctx);
     }
 
     private static LevelDocument NewDocument(out StoreyData storey)
