@@ -96,15 +96,26 @@ public sealed class MaterialResolver
         return dup;
     }
 
-    /// <summary>A pathless copy of <paramref name="tex"/> (so it embeds inline). Already-pathless textures
-    /// pass through; a path-bearing one is re-wrapped from its decoded (decompressed) image.</summary>
+    /// <summary>
+    /// A pathless, inline-serializable copy of <paramref name="tex"/> as a
+    /// <see cref="PortableCompressedTexture2D"/> (lossless PNG). Pathless = embeds in the .tscn with no
+    /// res:// dependency; PNG-compressed = a fraction of the size of a raw <see cref="ImageTexture"/>
+    /// (which serializes the full uncompressed bitmap as base64 text — the cause of huge exports).
+    /// </summary>
     private static Texture2D Embed(Texture2D tex)
     {
-        if (tex == null || string.IsNullOrEmpty(tex.ResourcePath)) return tex;
+        if (tex == null) return null;
         Image img = tex.GetImage();
         if (img == null) return tex;
-        if (img.IsCompressed()) img.Decompress(); // CreateFromImage needs an uncompressed image
-        return ImageTexture.CreateFromImage(img);
+        if (img.IsCompressed()) img.Decompress(); // CreateFromImage needs an uncompressed source image
+
+        // Running outside the Godot editor, PortableCompressedTexture2D frees its CPU-side compressed
+        // buffer after GPU upload — so it would serialize with size but NO data (empty → pink in the
+        // target project). Keep the buffer so the compressed bytes actually get written into the .tscn.
+        PortableCompressedTexture2D.SetKeepAllCompressedBuffers(true);
+        var pct = new PortableCompressedTexture2D { KeepCompressedBuffer = true };
+        pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
+        return pct;
     }
 
     /// <summary>An entry's material: a loaded .material/.tres if it has one, else a StandardMaterial3D built from its texture.</summary>

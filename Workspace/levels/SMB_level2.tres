@@ -1,0 +1,153 @@
+[gd_resource type="Resource" script_class="LevelDocument" format=3]
+
+[ext_resource type="Script" path="res://Source/Core/Data/GridSettings.cs" id="1_hcpq8"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialEntry.cs" id="2_2vcku"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialLibrary.cs" id="3_ukaeo"]
+[ext_resource type="Script" path="res://Source/Core/Data/StoreyData.cs" id="4_y64t8"]
+[ext_resource type="Script" path="res://Source/Core/Data/PrimitiveInstanceData.cs" id="5_sb37i"]
+[ext_resource type="Script" path="res://Source/Core/Data/OpeningData.cs" id="6_klbqa"]
+[ext_resource type="Script" path="res://Source/Core/Data/LevelDocument.cs" id="7_igrkq"]
+
+[sub_resource type="Resource" id="Resource_02hb8"]
+script = ExtResource("1_hcpq8")
+
+[sub_resource type="Resource" id="Resource_dyhmk"]
+script = ExtResource("2_2vcku")
+Id = "proto_floor"
+DisplayName = "Proto Floor"
+MaterialPath = "res://Assets/Materials/proto_floor.tres"
+
+[sub_resource type="Resource" id="Resource_fhuys"]
+script = ExtResource("2_2vcku")
+Id = "proto_wall"
+DisplayName = "Proto Wall"
+MaterialPath = "res://Assets/Materials/proto_wall.tres"
+
+[sub_resource type="Resource" id="Resource_rvsld"]
+script = ExtResource("2_2vcku")
+Id = "proto_trim"
+DisplayName = "Proto Trim"
+MaterialPath = "res://Assets/Materials/proto_trim.tres"
+
+[sub_resource type="Resource" id="Resource_ca2v7"]
+script = ExtResource("3_ukaeo")
+Entries = Array[ExtResource("2_2vcku")]([SubResource("Resource_dyhmk"), SubResource("Resource_fhuys"), SubResource("Resource_rvsld")])
+
+[sub_resource type="Resource" id="Resource_gg72i"]
+script = ExtResource("5_sb37i")
+Id = "64a21798"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33.5, 0, -2.5)
+Parameters = {
+"depth": 21.0,
+"thickness": 0.2,
+"width": 9.0
+}
+MaterialSlots = {
+"Bottom": "proto_trim",
+"Edge": "proto_trim",
+"Top": "proto_floor"
+}
+
+[sub_resource type="Resource" id="Resource_7lw8m"]
+script = ExtResource("5_sb37i")
+Id = "750911ca"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(-0.529999, 0, -0.84799826, 0, 1, 0, 0.84799826, 0, -0.529999, -34.5, 0, -6)
+Parameters = {
+"height": 3.0,
+"length": 9.433981,
+"thickness": 0.2
+}
+MaterialSlots = {
+"Back": "proto_wall",
+"Ends": "proto_trim",
+"Front": "proto_wall",
+"Reveal": "proto_trim",
+"Top": "proto_trim"
+}
+
+[sub_resource type="Resource" id="Resource_jsbgp"]
+script = ExtResource("5_sb37i")
+Id = "23da4b04"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(0.164399, 0, -0.9863939, 0, 1, 0, 0.9863939, 0, 0.164399, -36.5, 0, 1)
+Parameters = {
+"height": 3.0,
+"length": 6.0827627,
+"thickness": 0.2
+}
+MaterialSlots = {
+"Back": "proto_wall",
+"Ends": "proto_trim",
+"Front": "proto_wall",
+"Reveal": "proto_trim",
+"Top": "proto_trim"
+}
+
+[sub_resource type="Resource" id="Resource_s1qkt"]
+script = ExtResource("5_sb37i")
+Id = "5d771f2a"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(0.76822126, 0, 0.6401844, 0, 1, 0, -0.6401844, 0, 0.76822126, -33, 0, 1.5)
+Parameters = {
+"height": 3.0,
+"length": 7.81025,
+"thickness": 0.2
+}
+MaterialSlots = {
+"Back": "proto_wall",
+"Ends": "proto_trim",
+"Front": "proto_wall",
+"Reveal": "proto_trim",
+"Top": "proto_trim"
+}
+
+[sub_resource type="Resource" id="Resource_633tr"]
+script = ExtResource("5_sb37i")
+Id = "1fc359b7"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(-0.16439897, 0, 0.9863939, 0, 1, 0, -0.9863939, 0, -0.16439897, -30.5, 0, -4)
+Parameters = {
+"height": 3.0,
+"length": 6.0827627,
+"thickness": 0.2
+}
+MaterialSlots = {
+"Back": "proto_wall",
+"Ends": "proto_trim",
+"Front": "proto_wall",
+"Reveal": "proto_trim",
+"Top": "proto_trim"
+}
+
+[sub_resource type="Resource" id="Resource_7rboh"]
+script = ExtResource("5_sb37i")
+Id = "7ff1bd71"
+PrimitiveType = "wall"
+LocalTransform = Transform3D(-0.6000001, 0, -0.79999995, 0, 1, 0, 0.79999995, 0, -0.6000001, -32.5, 0, -5)
+Parameters = {
+"height": 3.0,
+"length": 5.0,
+"thickness": 0.2
+}
+MaterialSlots = {
+"Back": "proto_wall",
+"Ends": "proto_trim",
+"Front": "proto_wall",
+"Reveal": "proto_trim",
+"Top": "proto_trim"
+}
+
+[sub_resource type="Resource" id="Resource_y41k4"]
+script = ExtResource("4_y64t8")
+Id = "8c16ed32"
+Name = "Ground Floor"
+Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_gg72i"), SubResource("Resource_7lw8m"), SubResource("Resource_jsbgp"), SubResource("Resource_s1qkt"), SubResource("Resource_633tr"), SubResource("Resource_7rboh")])
+
+[resource]
+script = ExtResource("7_igrkq")
+Name = "SMB_level2"
+Grid = SubResource("Resource_02hb8")
+Materials = SubResource("Resource_ca2v7")
+Storeys = Array[ExtResource("4_y64t8")]([SubResource("Resource_y41k4")])

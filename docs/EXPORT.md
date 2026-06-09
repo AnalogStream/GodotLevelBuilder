@@ -151,10 +151,15 @@ are made **self-contained** by `MaterialResolver.ResolveEmbedded`:
 
 - Each material is shallow-`Duplicate(false)`d (so the live-preview cache's original is untouched and
   its path-bearing textures stay shareable) and every texture is replaced with a **pathless**
-  `ImageTexture.CreateFromImage(tex.GetImage())` (decompressed first if needed).
+  `PortableCompressedTexture2D` (lossless PNG) built from the decoded image.
 - A pathless resource serializes **inline** as a `sub_resource`, so the exported `.tscn` carries its
   textures with it and opens in *any* project — no `res://` path dependency on the builder or the
   game, no texture-file copying, no matching folder structure required.
+- **Why `PortableCompressedTexture2D`, not `ImageTexture`:** a raw `ImageTexture` serializes the full
+  *uncompressed* bitmap as base64 text — for prototype textures that bloated a scene to ~45 MB.
+  `PortableCompressedTexture2D` stores a PNG-compressed blob inline (still self-contained), shrinking
+  it by ~100× for flat textures. For even smaller production output, save the scene as a compressed
+  binary `.scn` (`ResourceSaver` `Compress` flag) — not done by default to keep the `.tscn` readable.
 - This flattens both texture-entry materials **and** proto `.material` files (whose Kenney textures
   would otherwise serialize as broken `res://` ext_resources).
 
