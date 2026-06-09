@@ -25,6 +25,7 @@ public partial class LevelView : Node3D
     {
         _doc = doc;
         _registry = registry;
+        _materials.Clear(); // a new document has its own MaterialLibrary — don't serve a stale cached material by id
     }
 
     /// <summary>

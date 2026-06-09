@@ -18,7 +18,8 @@ namespace LevelBuilder.Editor.Session;
 /// </summary>
 public sealed class EditorContext
 {
-    public LevelDocument Document { get; init; }
+    /// <summary>The open document. Swapped in place by <see cref="ReplaceDocument"/> (New/Open).</summary>
+    public LevelDocument Document { get; private set; }
     /// <summary>The storey currently being edited; new geometry goes here. Switch with <see cref="StoreyUp"/>/<see cref="StoreyDown"/>.</summary>
     public StoreyData Storey { get; private set; }
     public PrimitiveRegistry Registry { get; init; }
@@ -29,6 +30,13 @@ public sealed class EditorContext
     public Node3D PreviewLayer { get; init; }
     public InstancePicker Picker { get; init; }
     public GizmoLayer Gizmos { get; init; }
+    /// <summary>Persistent app settings (workspace + target + last level). Set by Main.</summary>
+    public AppConfig Config { get; init; }
+    /// <summary>Cancels any in-progress tool op before a document swap. Wired by Main to ToolManager.CancelActive.</summary>
+    public System.Action CancelActiveTool { get; set; }
+
+    /// <summary>Disk path of the currently open level .tres, or "" if never saved/opened this document.</summary>
+    public string CurrentLevelPath { get; private set; } = "";
 
     public string SelectedId { get; private set; }
     /// <summary>Non-null when an opening is selected; <see cref="SelectedId"/> is then its owning wall.</summary>
@@ -284,16 +292,77 @@ public sealed class EditorContext
         return (null, null, -1);
     }
 
-    private const string SourceDir = "res://Saved";
     private const string BakedDir = "res://Baked";
 
-    /// <summary>Saves the editable source .tres (re-openable).</summary>
+    // ---- document lifecycle (New / Open / Save) --------------------------
+
+    /// <summary>
+    /// Swaps in a different document and re-points everything derived from it: cancels any in-progress
+    /// tool op, re-targets the live view, clears the undo history + selection, and activates the
+    /// document's first storey. Panels resync via the <see cref="Changed"/> event fired from Refresh.
+    /// </summary>
+    public void ReplaceDocument(LevelDocument doc)
+    {
+        CancelActiveTool?.Invoke(); // a half-drawn primitive must not straddle two documents
+
+        if (doc.Storeys.Count == 0) // a malformed/empty load still needs a storey to edit on
+            doc.Storeys.Add(new StoreyData { Id = Ids.New(), Name = "Ground Floor", BaseElevation = 0f, Height = 3f });
+
+        Document = doc;
+        SelectedId = null;
+        SelectedOpeningId = null;
+        View.Setup(doc, Registry); // re-target + drop stale material cache; Rebuild (below) clears old meshes
+        Commands.Clear();
+        SetActiveStorey(doc.Storeys[0]); // positions grid/cursor at the ground storey
+        Refresh();                       // rebuild the view for the new document
+    }
+
+    /// <summary>Starts a fresh, empty level (discards unsaved edits — explicit-save workflow).</summary>
+    public void NewLevel()
+    {
+        ReplaceDocument(LevelDocument.CreateEmpty());
+        CurrentLevelPath = "";
+    }
+
+    /// <summary>Opens an editable level .tres from disk and makes it the active document. Returns success.</summary>
+    public bool OpenLevel(string path)
+    {
+        LevelDocument doc = LevelSerializer.Load(path);
+        if (doc == null)
+        {
+            GD.PrintErr($"[open] could not load {path}");
+            return false;
+        }
+        ReplaceDocument(doc);
+        CurrentLevelPath = path;
+        RememberLastLevel(path);
+        return true;
+    }
+
+    /// <summary>Saves the editable source .tres into the workspace's levels/ folder (re-openable).</summary>
     public void SaveSource()
     {
-        EnsureDir(SourceDir);
-        string path = $"{SourceDir}/{FileStem()}.tres";
+        if (!Workspace.IsSet)
+        {
+            GD.PushWarning("[save] no workspace set — pick a workspace folder first (Project tab).");
+            return;
+        }
+        EnsureDir(Workspace.LevelsDir);
+        string path = $"{Workspace.LevelsDir}/{FileStem()}.tres";
         Error e = LevelSerializer.Save(Document, path);
         Report("save", path, e);
+        if (e == Error.Ok)
+        {
+            CurrentLevelPath = path;
+            RememberLastLevel(path);
+        }
+    }
+
+    private void RememberLastLevel(string path)
+    {
+        if (Config == null) return;
+        Config.LastLevelPath = path;
+        Config.Save();
     }
 
     /// <summary>Bakes a game-ready .tscn (meshes + collision) you can open in Godot.</summary>
@@ -314,6 +383,25 @@ public sealed class EditorContext
         string path = $"{BakedDir}/{FileStem()}_merged.tscn";
         Error e = new SceneBaker(Registry).BakeMergedToFile(Document, path);
         Report("bake merged", path, e);
+    }
+
+    /// <summary>
+    /// Exports a merged chunk straight into the target game project (<c>&lt;target&gt;/levels/&lt;Name&gt;.tscn</c>)
+    /// with textures <b>embedded inline</b>, so the .tscn is self-contained and drops into that project
+    /// with no res:// dependency on the builder. Uses an absolute OS path outside this project.
+    /// </summary>
+    public void ExportToGame()
+    {
+        if (Config == null || !Config.HasTarget)
+        {
+            GD.PushWarning("[export] no target game project set — pick one in the Project tab first.");
+            return;
+        }
+        string dir = $"{Config.TargetProjectPath}/levels";
+        EnsureDir(dir);
+        string path = $"{dir}/{FileStem()}.tscn";
+        Error e = new SceneBaker(Registry).BakeMergedToFile(Document, path, embedTextures: true);
+        Report("export", path, e);
     }
 
     private string FileStem()

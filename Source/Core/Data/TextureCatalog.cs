@@ -9,15 +9,19 @@ public readonly record struct TextureItem(string Path, string Group, string Name
 /// <summary>
 /// Discovers the raw textures the builder can paint with — the bundled Kenney prototype pack
 /// (res://Assets/kenney_prototype_textures/&lt;color&gt;/texture_NN.png) plus any the user has added
-/// (res://Assets/user_textures/*) — and turns a chosen texture into a stable
+/// (the workspace <c>textures/</c> folder) — and turns a chosen texture into a stable
 /// <see cref="MaterialLibrary"/> entry so instances can reference it by id.
+///
+/// User textures are stored by their <em>workspace-relative</em> path (<c>textures/foo.png</c>) so a
+/// level's .tres survives the workspace folder being moved; the bundled pack keeps its res:// path.
+/// <see cref="Workspace.ResolveTexture"/> (via <see cref="TextureLoader"/>) resolves either form.
 /// </summary>
 public static class TextureCatalog
 {
     public const string Root = "res://Assets/kenney_prototype_textures";
 
-    /// <summary>Where user-added textures are copied so they get a stable res:// path (bake/save reference paths).</summary>
-    public const string UserRoot = "res://Assets/user_textures";
+    /// <summary>Workspace-relative folder (under <see cref="Workspace.Root"/>) holding user-added textures.</summary>
+    public const string UserRel = "textures";
 
     private static readonly string[] ImageExts = { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tga" };
 
@@ -47,12 +51,13 @@ public static class TextureCatalog
 
     private static void LoadUser(List<TextureItem> items)
     {
-        using DirAccess dir = DirAccess.Open(UserRoot);
+        if (!Workspace.IsSet) return; // no workspace chosen yet
+        using DirAccess dir = DirAccess.Open(Workspace.TexturesDir);
         if (dir == null) return; // folder only exists once the user has added something
 
         foreach (string file in dir.GetFiles())
             if (IsImage(file))
-                items.Add(new TextureItem($"{UserRoot}/{file}", "custom", file));
+                items.Add(new TextureItem($"{UserRel}/{file}", "custom", file)); // workspace-relative
     }
 
     private static bool IsImage(string file)
@@ -64,28 +69,35 @@ public static class TextureCatalog
     }
 
     /// <summary>
-    /// Copies a user-chosen image (an OS-absolute path from the file dialog) into <see cref="UserRoot"/>
-    /// so it gets a stable res:// path that save/bake can reference. Returns the res:// destination, or
-    /// "" on failure. Overwrites an existing file of the same name (re-adding the same texture is idempotent).
+    /// Copies a user-chosen image (an OS-absolute path from the file dialog) into the workspace
+    /// <c>textures/</c> folder so it gets a stable, portable path. Returns the workspace-relative
+    /// destination (<c>textures/foo.png</c>), or "" on failure (incl. no workspace chosen).
+    /// Overwrites an existing file of the same name (re-adding the same texture is idempotent).
     /// </summary>
     public static string ImportUserTexture(string sourcePath)
     {
-        Error mk = DirAccess.MakeDirRecursiveAbsolute(UserRoot);
-        if (mk != Error.Ok && mk != Error.AlreadyExists)
+        if (!Workspace.IsSet)
         {
-            GD.PushWarning($"[texture] could not create {UserRoot}: {mk}");
+            GD.PushWarning("[texture] no workspace set — choose a workspace before adding textures.");
             return "";
         }
 
-        string dest = $"{UserRoot}/{sourcePath.GetFile()}";
-        Error e = DirAccess.CopyAbsolute(sourcePath, dest);
+        Error mk = DirAccess.MakeDirRecursiveAbsolute(Workspace.TexturesDir);
+        if (mk != Error.Ok && mk != Error.AlreadyExists)
+        {
+            GD.PushWarning($"[texture] could not create {Workspace.TexturesDir}: {mk}");
+            return "";
+        }
+
+        string file = sourcePath.GetFile();
+        Error e = DirAccess.CopyAbsolute(sourcePath, $"{Workspace.TexturesDir}/{file}");
         if (e != Error.Ok)
         {
             GD.PrintErr($"[texture] copy failed ({e}): {sourcePath}");
             return "";
         }
-        GD.Print($"[texture] added {dest}");
-        return dest;
+        GD.Print($"[texture] added {Workspace.TexturesDir}/{file}");
+        return $"{UserRel}/{file}";
     }
 
     /// <summary>Stable library id for a texture path (so re-applying the same texture reuses one entry).</summary>

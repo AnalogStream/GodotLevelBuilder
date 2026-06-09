@@ -12,6 +12,13 @@ public sealed class CommandStack
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
+    /// <summary>Drops all undo/redo history (e.g. when a different document is opened).</summary>
+    public void Clear()
+    {
+        _undo.Clear();
+        _redo.Clear();
+    }
+
     public void Execute(ICommand command)
     {
         command.Do();

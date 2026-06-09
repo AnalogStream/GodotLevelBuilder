@@ -31,15 +31,16 @@ public static class TextureLoader
 
     private static Texture2D LoadUncached(string path)
     {
-        // Imported asset: let Godot load the .ctex (mipmaps, compression, the real thing).
-        if (ResourceLoader.Exists(path))
+        // Bundled pack (res://): let Godot load the .ctex (mipmaps, compression, the real thing).
+        if (path.StartsWith("res://") && ResourceLoader.Exists(path))
         {
             var imported = ResourceLoader.Load<Texture2D>(path);
             if (imported != null) return imported;
         }
 
-        // Not imported yet (freshly copied this session) — decode the raw file directly.
-        string abs = ProjectSettings.GlobalizePath(path);
+        // Workspace-relative ("textures/foo.png"), absolute, or un-imported res:// — decode raw off
+        // disk. Workspace.ResolveTexture is the single arbiter that turns the stored form absolute.
+        string abs = ProjectSettings.GlobalizePath(Workspace.ResolveTexture(path));
         Image img = Image.LoadFromFile(abs);
         return img == null ? null : ImageTexture.CreateFromImage(img);
     }

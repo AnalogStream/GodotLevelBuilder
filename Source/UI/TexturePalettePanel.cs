@@ -57,6 +57,9 @@ public partial class TexturePalettePanel : MarginContainer
         Populate();
     }
 
+    /// <summary>Rebuilds the swatch grid from the current catalog (e.g. after the workspace changes).</summary>
+    public void Refresh() => Populate();
+
     /// <summary>Rebuilds the swatch grid from the current catalog (call after adding textures).</summary>
     private void Populate()
     {

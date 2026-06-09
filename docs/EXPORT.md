@@ -9,11 +9,41 @@ A level has two on-disk forms:
 
 The source is never derived from the bake. The bake is a pure function of the source.
 
+## The workspace (where editable data lives)
+
+The builder is a **standalone app**, so its writable data can't live under `res://` (read-only once
+the app is exported as a binary). Instead the user picks a **workspace folder** once; it holds:
+
+```
+<workspace>/
+  levels/      *.tres editable level sources  (the "project files")
+  textures/    custom textures, copied here on import
+```
+
+The pointer to the workspace persists in `user://levelbuilder.cfg` (`AppConfig`, a `ConfigFile` —
+`user://` is the one location always writable, even when exported). `Core/Data/Workspace.cs` holds
+the resolved root for the session and is the single arbiter of texture-path resolution: a stored
+path is `res://…` (bundled Kenney pack), an absolute OS path, or **workspace-relative**
+(`textures/foo.png`) — the relative form is what custom textures store, so a level survives the
+workspace folder being moved. The last opened level is remembered and reopened on launch.
+
 ## Save / load
 
-- **Save:** `ResourceSaver.Save(document, path)` → `.tres`. The whole graph (storeys, instances, openings, material library) serializes inline (see `DATA_MODEL.md` for the C# rules). Lossless and re-openable.
-- **Load:** `ResourceLoader.Load<LevelDocument>(path)`, then run schema migrations if `SchemaVersion` is behind.
+- **Save:** `ResourceSaver.Save(document, path)` → `.tres` at `<workspace>/levels/<Name>.tres`. The
+  whole graph (storeys, instances, openings, material library) serializes inline (see `DATA_MODEL.md`
+  for the C# rules). Lossless and re-openable.
+- **Load:** `ResourceLoader.Load<LevelDocument>(path, CacheMode.Ignore)`; `EditorContext.OpenLevel`
+  swaps it into the running editor (`ReplaceDocument`: re-targets the view, clears undo/selection,
+  activates the ground storey). Then run schema migrations if `SchemaVersion` is behind.
 - Saving is independent of baking — you can save work-in-progress that isn't ready to bake.
+
+> **Load-bearing (handled):** Save/Open/Export use **absolute OS paths outside the project**. Godot's
+> text writer *drops* the `res://` script `ext_resource` lines when a `.tres` is written directly to an
+> external path — producing a scriptless, empty resource (a `LevelDocument` reloads as a bare
+> `Resource`). `Core/Build/ResourceIo.cs` works around this: it serialises to a `user://` temp (where
+> the `res://` refs are written correctly) then byte-copies the file to the destination, and on load
+> copies the external file into a `user://` temp first so the `res://` script refs resolve against the
+> running project. `LevelSerializer` and `SceneBaker.*ToFile` both route through it.
 
 ## Bake → `.tscn`
 
@@ -109,6 +139,30 @@ not overwrite the per-instance bake). Triggered from the **Project** tab ("Bake 
 texture can no longer be overridden separately in-game. That's inherent to the chunk approach — use
 the per-instance `Bake` when you need per-object override granularity.
 
-## Export target
+## Export to the target game project (inline-embedded textures)
 
-The builder exports into a chosen folder (typically `res://levels/` of the game project). Both artifacts may be written: `.tres` kept with the builder's projects, `.tscn` written to the game. The export dialog records the last target per level so re-bake is one click.
+`EditorContext.ExportToGame` (Project tab → "Export to Game", enabled once a target is set) writes a
+**merged chunk** into the target game project at `<TargetProjectPath>/levels/<Name>.tscn` — an
+**absolute OS path outside this project** (`ResourceSaver.Save` to a global path). The target project
+root is chosen once and persisted in `AppConfig.TargetProjectPath`.
+
+The key difference from the local preview bakes: export passes `embedTextures: true`, so materials
+are made **self-contained** by `MaterialResolver.ResolveEmbedded`:
+
+- Each material is shallow-`Duplicate(false)`d (so the live-preview cache's original is untouched and
+  its path-bearing textures stay shareable) and every texture is replaced with a **pathless**
+  `ImageTexture.CreateFromImage(tex.GetImage())` (decompressed first if needed).
+- A pathless resource serializes **inline** as a `sub_resource`, so the exported `.tscn` carries its
+  textures with it and opens in *any* project — no `res://` path dependency on the builder or the
+  game, no texture-file copying, no matching folder structure required.
+- This flattens both texture-entry materials **and** proto `.material` files (whose Kenney textures
+  would otherwise serialize as broken `res://` ext_resources).
+
+**Verify (not grep-able):** zero `ext_resource path="res://…"` lines for textures proves
+self-containment, but a bad `Decompress` can yield a *pathless garbage* image that still passes that
+check — the real gate is opening the exported `.tscn` in the target project and **seeing the texture
+render**. The baked tree references only built-in Godot node types, so it opens without the builder's
+C#.
+
+The two local **Bake** buttons (per-object → `res://Baked/<Name>.tscn`, merged →
+`<Name>_merged.tscn`) are unchanged in-project previews and do **not** embed.

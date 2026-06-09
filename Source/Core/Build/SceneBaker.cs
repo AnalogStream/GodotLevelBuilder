@@ -25,8 +25,10 @@ public sealed class SceneBaker
 
     public SceneBaker(PrimitiveRegistry registry) => _registry = registry;
 
-    /// <summary>Builds the node tree. Caller owns the returned root (free or add to a tree).</summary>
-    public Node3D Bake(LevelDocument doc)
+    /// <summary>Builds the node tree. Caller owns the returned root (free or add to a tree).
+    /// <paramref name="embedTextures"/> makes materials self-contained (inline textures) for export
+    /// into a different project (see <see cref="MaterialResolver.ResolveEmbedded"/>).</summary>
+    public Node3D Bake(LevelDocument doc, bool embedTextures = false)
     {
         var ctx = new BuildContext { Materials = doc.Materials, CellSize = doc.Grid.CellSize };
         var materials = new MaterialResolver();
@@ -63,7 +65,7 @@ public sealed class SceneBaker
                 }
 
                 ArrayMesh mesh = prim.BuildMesh(inst, ctx);
-                materials.AssignSurfaceMaterials(mesh, prim, inst, doc.Materials);
+                materials.AssignSurfaceMaterials(mesh, prim, inst, doc.Materials, embedTextures);
 
                 // Prefix with the primitive type (Floor_, Wall_, …) so the baked tree is readable
                 // instead of an opaque Mesh_<id>. The <id> stays in the name to keep it unique,
@@ -97,9 +99,9 @@ public sealed class SceneBaker
     }
 
     /// <summary>Bakes and writes a .tscn to <paramref name="path"/>. Returns the save Error.</summary>
-    public Error BakeToFile(LevelDocument doc, string path)
+    public Error BakeToFile(LevelDocument doc, string path, bool embedTextures = false)
     {
-        Node3D root = Bake(doc);
+        Node3D root = Bake(doc, embedTextures);
         SetOwnerRecursive(root, root);
 
         var packed = new PackedScene();
@@ -110,7 +112,7 @@ public sealed class SceneBaker
             return packErr;
         }
 
-        Error saveErr = ResourceSaver.Save(packed, path);
+        Error saveErr = ResourceIo.SaveTo(packed, path); // handles external (target-project) paths
         root.QueueFree();
         return saveErr;
     }
@@ -128,7 +130,7 @@ public sealed class SceneBaker
     /// can no longer be overridden separately in-game. That's the cost of the chunk approach.
     /// Caller owns the returned root.
     /// </summary>
-    public Node3D BakeMerged(LevelDocument doc)
+    public Node3D BakeMerged(LevelDocument doc, bool embedTextures = false)
     {
         var materials = new MaterialResolver();
         var root = new Node3D { Name = SanitizeName(doc.Name) };
@@ -187,7 +189,9 @@ public sealed class SceneBaker
             ArrayMesh merged = kv.Value.Commit();
             if (merged.GetSurfaceCount() == 0) continue;
 
-            Material mat = materials.Resolve(kv.Key, doc.Materials);
+            Material mat = embedTextures
+                ? materials.ResolveEmbedded(kv.Key, doc.Materials)
+                : materials.Resolve(kv.Key, doc.Materials);
             if (mat != null) merged.SurfaceSetMaterial(0, mat); // on the SURFACE, override stays free
 
             string name = string.IsNullOrEmpty(kv.Key) ? "Mesh_nomat" : $"Mesh_{SanitizeName(kv.Key)}";
@@ -209,9 +213,9 @@ public sealed class SceneBaker
     }
 
     /// <summary>Merge-bakes and writes a .tscn to <paramref name="path"/>. Returns the save Error.</summary>
-    public Error BakeMergedToFile(LevelDocument doc, string path)
+    public Error BakeMergedToFile(LevelDocument doc, string path, bool embedTextures = false)
     {
-        Node3D root = BakeMerged(doc);
+        Node3D root = BakeMerged(doc, embedTextures);
         SetOwnerRecursive(root, root);
 
         var packed = new PackedScene();
@@ -222,7 +226,7 @@ public sealed class SceneBaker
             return packErr;
         }
 
-        Error saveErr = ResourceSaver.Save(packed, path);
+        Error saveErr = ResourceIo.SaveTo(packed, path); // handles external (target-project) paths
         root.QueueFree();
         return saveErr;
     }

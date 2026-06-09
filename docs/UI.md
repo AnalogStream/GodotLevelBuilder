@@ -21,7 +21,8 @@ VSplitContainer  (full rect)
 │       └─ InspectorPanel     (right dock, selected object's properties)
 └─ TabContainer  (bottom dock, min height 180)
     ├─ PrimitivePalettePanel   "Primitives"  (draw tools, grouped by category)
-    └─ TexturePalettePanel     "Textures"    (the texture library — drag sources)
+    ├─ TexturePalettePanel     "Textures"    (the texture library — drag sources)
+    └─ ProjectPanel            "Project"     (workspace, New/Open/Save, bake + export-to-game)
 ```
 
 `TabContainer` uses each child's `Name` as the tab title.
@@ -110,6 +111,25 @@ and `MaterialResolver` (the applied material) route through it, so the swatch *a
 geometry appear the same session, no reimport required. (Cached by path; re-adding a different file
 under the same name shows the stale one until restart — minor, two caches to evict for a real fix.)
 See `EXPORT.md` for the one bake-time caveat (baking before reimport embeds the texture inline).
+
+### ProjectPanel (bottom tab 3)
+Document-level actions, all routed through `EditorContext`/`AppConfig` (same paths as the hotkeys):
+
+- **Workspace** — label + "Change…" (`FileDialog{OpenDir}`). Picking a folder persists it to
+  `user://levelbuilder.cfg`, sets `Workspace.SetRoot` (creates `levels/` + `textures/`), and
+  repopulates the texture palette (a `textures.Refresh` callback passed from `Main`).
+- **Level** — a name `LineEdit` (the only focus-taking widget here; it edits `Document.Name`, which
+  is metadata, not undo-tracked) + **New** / **Open…** / **Save**. Open is a `FileDialog{OpenFile,
+  *.tres}` rooted at `<workspace>/levels`; Save writes there and remembers the path for resume.
+- **Bake (local preview)** — per-object and merged-chunk bakes into `res://Baked` (in-project, no
+  embed). See `EXPORT.md`.
+- **Export to game** — target label + "Set…" (`FileDialog{OpenDir}`) + **Export to Game** (disabled
+  until a target is set). Writes a merged chunk with inline-embedded textures into
+  `<target>/levels/<Name>.tscn`. See `EXPORT.md`.
+
+The panel keeps the name field in sync after New/Open by listening to `EditorContext.Changed` (and
+only writing when the field isn't focused, so it never clobbers typing). Every button is
+`FocusMode = None` to protect tool hotkeys.
 
 ## Drag-and-drop: applying textures
 

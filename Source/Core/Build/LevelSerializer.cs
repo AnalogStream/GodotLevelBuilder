@@ -3,20 +3,14 @@ using LevelBuilder.Core.Data;
 
 namespace LevelBuilder.Core.Build;
 
-/// <summary>Saves/loads a LevelDocument to/from a .tres (the editable source).</summary>
+/// <summary>Saves/loads a LevelDocument to/from a .tres (the editable source). Routes through
+/// <see cref="ResourceIo"/> so saving to a workspace folder OUTSIDE the project keeps the script
+/// references (a direct external save drops them — see ResourceIo).</summary>
 public static class LevelSerializer
 {
-    public static Error Save(LevelDocument doc, string path)
-    {
-        return ResourceSaver.Save(doc, path);
-    }
+    public static Error Save(LevelDocument doc, string path) => ResourceIo.SaveTo(doc, path);
 
-    /// <summary>
-    /// Loads with CacheMode.Ignore so we get a fresh instance off disk — essential for
-    /// the round-trip test, otherwise the loader returns the still-in-memory document.
-    /// </summary>
-    public static LevelDocument Load(string path)
-    {
-        return ResourceLoader.Load<LevelDocument>(path, null, ResourceLoader.CacheMode.Ignore);
-    }
+    /// <summary>Loads fresh off disk (CacheMode.Ignore). Returns null if the file isn't a
+    /// LevelDocument (e.g. a legacy scriptless save) instead of throwing.</summary>
+    public static LevelDocument Load(string path) => ResourceIo.LoadFrom(path) as LevelDocument;
 }

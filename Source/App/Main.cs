@@ -30,6 +30,12 @@ public partial class Main : Node3D
     {
         GD.Print("=== LevelBuilder — editor shell (docked scene tree) ===");
 
+        // App config + workspace: the writable home for levels and custom textures, chosen by the
+        // user (res:// is read-only once the builder is exported as a binary). Restored from
+        // user://levelbuilder.cfg; the static Workspace pointer drives the texture path helpers.
+        AppConfig config = AppConfig.Load();
+        if (config.HasWorkspace) Workspace.SetRoot(config.WorkspacePath);
+
         LevelDocument doc = NewDocument(out StoreyData storey);
         PrimitiveRegistry registry = PrimitiveRegistry.CreateDefault();
 
@@ -98,7 +104,6 @@ public partial class Main : Node3D
 
         var ctx = new EditorContext
         {
-            Document = doc,
             Registry = registry,
             Commands = new CommandStack(),
             View = levelView,
@@ -107,15 +112,22 @@ public partial class Main : Node3D
             PreviewLayer = previewLayer,
             Picker = picker,
             Gizmos = gizmos,
+            Config = config,
         };
-        sceneTree.Setup(ctx);        // subscribe before the first Changed fires below
+        ctx.ReplaceDocument(doc);    // set the initial document BEFORE panels read ctx.Document in their Setup
+        sceneTree.Setup(ctx);        // panels self-populate here and subscribe for later Changed events
         inspector.Setup(ctx);
         viewportContainer.Setup(viewport, ctx.AssignTextureToInstance); // drop a swatch onto an object
-        ctx.SetActiveStorey(storey); // unified path: positions grid + cursor at the storey's elevation
         tools.Setup(ctx);
+        ctx.CancelActiveTool = tools.CancelActive; // so a document swap cancels a half-drawn primitive
         palette.Setup(registry, tools); // after tools.Setup so the primitive->tool map exists
         textures.Setup();
-        project.Setup(ctx);
+        project.Setup(ctx, config, textures.Refresh); // Change-workspace repopulates the texture palette
+
+        // Resume where we left off: reopen the last saved level if it still exists.
+        if (config.HasWorkspace && !string.IsNullOrEmpty(config.LastLevelPath)
+            && FileAccess.FileExists(config.LastLevelPath))
+            ctx.OpenLevel(config.LastLevelPath);
     }
 
     private static LevelDocument NewDocument(out StoreyData storey)
