@@ -71,7 +71,7 @@ public sealed class RampPlaneDrawTool : DrawToolBase
             Parameters = new Dictionary
             {
                 { "length", (double)length },
-                { "rise", (double)Ctx.Storey.Height },
+                { "rise", (double)Ctx.DefaultStoreyHeight },
                 { "width", (double)width },
                 { "thickness", 0.2 },
             },

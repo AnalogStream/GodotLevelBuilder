@@ -62,7 +62,7 @@ public sealed class CylinderDrawTool : DrawToolBase
             Parameters = new Dictionary
             {
                 { "radius", (double)radius },
-                { "height", (double)Ctx.Storey.Height },
+                { "height", (double)Ctx.DefaultStoreyHeight },
                 { "sides", 16 },
             },
         };

@@ -27,6 +27,7 @@ public partial class SceneTreePanel : PanelContainer
     private Tree _tree;
     private string _structureSig = "";
     private bool _suppressSignal;
+    private bool _rebuildQueued;
     private readonly Dictionary<string, TreeItem> _itemsByKey = new();
 
     private static readonly Color ActiveStoreyColor = new(0.55f, 0.80f, 1.0f);
@@ -64,7 +65,15 @@ public partial class SceneTreePanel : PanelContainer
 
     private void OnDocumentChanged()
     {
-        if (StructureSignature() != _structureSig) Rebuild();
+        if (StructureSignature() != _structureSig)
+        {
+            // Rebuild mutates the Tree (Clear/CreateItem). When the change originated from this Tree's own
+            // item_selected signal (e.g. clicking a storey row activates it), the Tree is "blocked" mid-emit
+            // and those calls fail ("blocked > 0"). Defer so the rebuild runs after the signal returns.
+            if (_rebuildQueued) return;
+            _rebuildQueued = true;
+            Callable.From(() => { _rebuildQueued = false; Rebuild(); }).CallDeferred();
+        }
         else SyncSelection(); // structure unchanged (e.g. a live drag): just keep the highlight in step
     }
 

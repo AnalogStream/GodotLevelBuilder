@@ -10,6 +10,7 @@
 
 [sub_resource type="Resource" id="Resource_02hb8"]
 script = ExtResource("1_hcpq8")
+HeightStep = 1.0
 
 [sub_resource type="Resource" id="Resource_dyhmk"]
 script = ExtResource("2_2vcku")
@@ -29,9 +30,21 @@ Id = "proto_trim"
 DisplayName = "Proto Trim"
 MaterialPath = "res://Assets/Materials/proto_trim.tres"
 
+[sub_resource type="Resource" id="Resource_843rf"]
+script = ExtResource("2_2vcku")
+Id = "tex:textures/cobblestone_3.png"
+DisplayName = "cobblestone_3.png"
+TexturePath = "textures/cobblestone_3.png"
+
+[sub_resource type="Resource" id="Resource_7haph"]
+script = ExtResource("2_2vcku")
+Id = "tex:textures/1K_Bricks.png"
+DisplayName = "1K_Bricks.png"
+TexturePath = "textures/1K_Bricks.png"
+
 [sub_resource type="Resource" id="Resource_ca2v7"]
 script = ExtResource("3_ukaeo")
-Entries = Array[ExtResource("2_2vcku")]([SubResource("Resource_dyhmk"), SubResource("Resource_fhuys"), SubResource("Resource_rvsld")])
+Entries = Array[ExtResource("2_2vcku")]([SubResource("Resource_dyhmk"), SubResource("Resource_fhuys"), SubResource("Resource_rvsld"), SubResource("Resource_843rf"), SubResource("Resource_7haph")])
 
 [sub_resource type="Resource" id="Resource_gg72i"]
 script = ExtResource("5_sb37i")
@@ -139,15 +152,116 @@ MaterialSlots = {
 "Top": "proto_trim"
 }
 
+[sub_resource type="Resource" id="Resource_kq50x"]
+script = ExtResource("5_sb37i")
+Id = "854d3414"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.5, 0, 0.5)
+Parameters = {
+"depth": 11.0,
+"thickness": 0.2,
+"width": 13.0
+}
+MaterialSlots = {
+"Bottom": "proto_trim",
+"Edge": "proto_trim",
+"Top": "proto_floor"
+}
+
 [sub_resource type="Resource" id="Resource_y41k4"]
 script = ExtResource("4_y64t8")
 Id = "8c16ed32"
 Name = "Ground Floor"
-Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_gg72i"), SubResource("Resource_7lw8m"), SubResource("Resource_jsbgp"), SubResource("Resource_s1qkt"), SubResource("Resource_633tr"), SubResource("Resource_7rboh")])
+Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_gg72i"), SubResource("Resource_7lw8m"), SubResource("Resource_jsbgp"), SubResource("Resource_s1qkt"), SubResource("Resource_633tr"), SubResource("Resource_7rboh"), SubResource("Resource_kq50x")])
+
+[sub_resource type="Resource" id="Resource_dgrrb"]
+script = ExtResource("5_sb37i")
+Id = "a2ed4e03"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 0, -6)
+Parameters = {
+"depth": 14.0,
+"thickness": 0.2,
+"width": 9.0
+}
+MaterialSlots = {
+"Bottom": "proto_trim",
+"Edge": "proto_trim",
+"Top": "proto_floor"
+}
+
+[sub_resource type="Resource" id="Resource_t42lb"]
+script = ExtResource("5_sb37i")
+Id = "08ad1a6c"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 0, 9.5)
+Parameters = {
+"depth": 9.0,
+"thickness": 0.2,
+"width": 3.0
+}
+MaterialSlots = {
+"Bottom": "proto_trim",
+"Edge": "proto_trim",
+"Top": "proto_floor"
+}
+
+[sub_resource type="Resource" id="Resource_vkwti"]
+script = ExtResource("4_y64t8")
+Id = "7c050dbd"
+Name = "Layer 1 m"
+BaseElevation = 1.0
+Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_dgrrb"), SubResource("Resource_t42lb")])
+
+[sub_resource type="Resource" id="Resource_2nexp"]
+script = ExtResource("5_sb37i")
+Id = "cfce5dc6"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.5, 0, -2)
+Parameters = {
+"depth": 20.0,
+"thickness": 0.2,
+"width": 9.0
+}
+MaterialSlots = {
+"Bottom": "tex:textures/1K_Bricks.png",
+"Edge": "tex:textures/1K_Bricks.png",
+"Top": "tex:textures/1K_Bricks.png"
+}
+
+[sub_resource type="Resource" id="Resource_uf4vc"]
+script = ExtResource("4_y64t8")
+Id = "379047f1"
+Name = "Layer 3 m"
+BaseElevation = 3.0
+Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_2nexp")])
+
+[sub_resource type="Resource" id="Resource_fu8m5"]
+script = ExtResource("5_sb37i")
+Id = "54e253ab"
+PrimitiveType = "floor"
+LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0, -11.5)
+Parameters = {
+"depth": 13.0,
+"thickness": 0.2,
+"width": 16.0
+}
+MaterialSlots = {
+"Bottom": "tex:textures/cobblestone_3.png",
+"Edge": "tex:textures/cobblestone_3.png",
+"Top": "tex:textures/cobblestone_3.png"
+}
+
+[sub_resource type="Resource" id="Resource_h2ed2"]
+script = ExtResource("4_y64t8")
+Id = "4f4b0ade"
+Name = "Layer -1 m"
+BaseElevation = -1.0
+Instances = Array[ExtResource("5_sb37i")]([SubResource("Resource_fu8m5")])
 
 [resource]
 script = ExtResource("7_igrkq")
 Name = "SMB_level2"
 Grid = SubResource("Resource_02hb8")
 Materials = SubResource("Resource_ca2v7")
-Storeys = Array[ExtResource("4_y64t8")]([SubResource("Resource_y41k4")])
+Storeys = Array[ExtResource("4_y64t8")]([SubResource("Resource_y41k4"), SubResource("Resource_vkwti"), SubResource("Resource_uf4vc"), SubResource("Resource_h2ed2")])

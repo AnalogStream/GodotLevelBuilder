@@ -70,7 +70,7 @@ public sealed class RampDrawTool : DrawToolBase
             Parameters = new Dictionary
             {
                 { "length", (double)length },
-                { "rise", (double)Ctx.Storey.Height },
+                { "rise", (double)Ctx.DefaultStoreyHeight },
                 { "width", (double)width },
             },
         };

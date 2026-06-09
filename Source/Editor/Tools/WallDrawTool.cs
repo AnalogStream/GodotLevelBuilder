@@ -70,7 +70,7 @@ public sealed class WallDrawTool : DrawToolBase
             Parameters = new Dictionary
             {
                 { "length", (double)length },
-                { "height", (double)Ctx.Storey.Height },
+                { "height", (double)Ctx.DefaultStoreyHeight },
                 { "thickness", 0.2 },
             },
         };

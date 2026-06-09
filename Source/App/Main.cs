@@ -119,7 +119,13 @@ public partial class Main : Node3D
         inspector.Setup(ctx);
         viewportContainer.Setup(viewport, ctx.AssignTextureToInstance); // drop a swatch onto an object
         tools.Setup(ctx);
-        ctx.CancelActiveTool = tools.CancelActive; // so a document swap cancels a half-drawn primitive
+        ctx.CancelActiveTool = tools.CancelActive; // so a document swap cancels a half-drawn primitive (and a height change)
+
+        // Draw-height indicator: a corner Control over the 3D view (not inside the SubViewport). Added
+        // AFTER the drop overlay so it stays the topmost child and its scrub drag isn't intercepted.
+        var heightIndicator = new HeightIndicatorPanel();
+        viewportContainer.AddChild(heightIndicator);
+        heightIndicator.Setup(ctx);
         palette.Setup(registry, tools); // after tools.Setup so the primitive->tool map exists
         textures.Setup();
         project.Setup(ctx, config, textures.Refresh); // Change-workspace repopulates the texture palette

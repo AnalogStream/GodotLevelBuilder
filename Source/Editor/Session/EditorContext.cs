@@ -20,8 +20,23 @@ public sealed class EditorContext
 {
     /// <summary>The open document. Swapped in place by <see cref="ReplaceDocument"/> (New/Open).</summary>
     public LevelDocument Document { get; private set; }
-    /// <summary>The storey currently being edited; new geometry goes here. Switch with <see cref="StoreyUp"/>/<see cref="StoreyDown"/>.</summary>
-    public StoreyData Storey { get; private set; }
+
+    private float _drawHeight;
+    /// <summary>
+    /// The free absolute elevation of the draw plane, metres — the single vertical truth. Set by the
+    /// height indicator (fine) or <see cref="StoreyUp"/>/<see cref="StoreyDown"/> (layer-to-layer).
+    /// New geometry lands in the elevation layer at this height (created lazily on placement).
+    /// </summary>
+    public float DrawHeight => _drawHeight;
+
+    /// <summary>
+    /// The elevation layer at the current <see cref="DrawHeight"/>, or null when the plane sits at a
+    /// height no layer occupies yet (a layer is minted the moment you place geometry there).
+    /// </summary>
+    public StoreyData Storey => Document.StoreyAt(_drawHeight);
+
+    /// <summary>Default wall/ramp/stairs height for freshly drawn primitives (no per-layer height needed).</summary>
+    public float DefaultStoreyHeight => Document.DefaultStoreyHeight;
     public PrimitiveRegistry Registry { get; init; }
     public CommandStack Commands { get; init; }
     public LevelView View { get; init; }
@@ -82,48 +97,76 @@ public sealed class EditorContext
         return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId));
     }
 
-    /// <summary>World offset of the ACTIVE storey's floor plane (where new geometry is drawn).</summary>
-    public Vector3 ElevationOffset => new(0, Storey.BaseElevation, 0);
+    /// <summary>World offset of the draw plane, where new geometry is drawn.</summary>
+    public Vector3 ElevationOffset => new(0, _drawHeight, 0);
+
+    /// <summary>
+    /// Moves the draw plane to an absolute elevation: repositions the grid + snap cursor and notifies UI.
+    /// View state only — NOT undoable. Always syncs the grid/cursor (so it can be called to initialize),
+    /// but only cancels an in-progress draw + fires <see cref="Changed"/> when the height actually moves.
+    /// </summary>
+    public void SetDrawHeight(float elevation)
+    {
+        bool moved = !Mathf.IsEqualApprox(elevation, _drawHeight);
+        if (moved) CancelActiveTool?.Invoke(); // a half-placed primitive can't straddle heights
+        _drawHeight = elevation;
+        Cursor.Elevation = elevation;
+        if (Grid != null) Grid.Position = new Vector3(0, elevation, 0);
+        if (moved) Changed?.Invoke();
+    }
+
+    /// <summary>Nudges the draw plane by <paramref name="steps"/> × the document's height step.</summary>
+    public void NudgeDrawHeight(int steps) => SetDrawHeight(_drawHeight + steps * Document.Grid.HeightStep);
 
     /// <summary>World offset of the storey that OWNS <paramref name="id"/> — not necessarily the active one.</summary>
     public Vector3 OffsetOfInstance(string id)
     {
         (StoreyData s, _, _) = Find(id);
-        return new Vector3(0, (s ?? Storey).BaseElevation, 0);
+        return new Vector3(0, s?.BaseElevation ?? _drawHeight, 0);
     }
 
     /// <summary>Offset of the storey owning the current selection, so handles/drags sit on the right level.</summary>
     public Vector3 SelectedInstanceOffset => OffsetOfInstance(SelectedId);
 
-    // ---- storeys ---------------------------------------------------------
+    // ---- elevation layers ------------------------------------------------
 
-    /// <summary>Moves up one storey, creating a new one stacked on top at the frontier.</summary>
+    /// <summary>Jumps to the next populated layer above; at the top, steps up one default-height "floor".</summary>
     public void StoreyUp() => SwitchStorey(+1);
-    /// <summary>Moves down one storey, creating a new one stacked below at the frontier.</summary>
+    /// <summary>Jumps to the next populated layer below; at the bottom, steps down one default-height "floor".</summary>
     public void StoreyDown() => SwitchStorey(-1);
 
     /// <summary>
-    /// Makes <paramref name="s"/> the active storey: the grid and snap cursor jump to its elevation and
-    /// any selection (possibly on another storey) is cleared. Also the single entry point used at startup.
+    /// Moves the draw plane to a layer's elevation (e.g. clicking a layer row in the scene tree, or at
+    /// startup). Clears any selection first, like the old storey switch.
     /// </summary>
     public void SetActiveStorey(StoreyData s)
     {
-        Storey = s;
-        Cursor.Elevation = s.BaseElevation;
-        if (Grid != null) Grid.Position = new Vector3(0, s.BaseElevation, 0);
-        GD.Print($"[storey] active: {s.Name}  (base {s.BaseElevation:0.##} m, height {s.Height:0.##} m)");
-        ClearSelection(); // drop a selection from another storey; refreshes view + gizmos if needed
-        Changed?.Invoke(); // ensure the active-storey marker updates even when nothing was selected
+        ClearSelection();
+        SetDrawHeight(s.BaseElevation);
+        GD.Print($"[layer] {s.Name}  (base {s.BaseElevation:0.##} m)");
     }
 
+    /// <summary>
+    /// Layer-to-layer navigation: jump to the nearest populated layer in <paramref name="dir"/> from the
+    /// current height; if none lies that way (we're at the frontier), step the draw plane a full default
+    /// height to a fresh, empty elevation where new geometry can be built.
+    /// </summary>
     private void SwitchStorey(int dir)
     {
-        List<StoreyData> sorted = SortedStoreys();
-        int idx = sorted.IndexOf(Storey);
-        StoreyData target = dir > 0
-            ? (idx + 1 < sorted.Count ? sorted[idx + 1] : CreateStacked(sorted[^1], +1))
-            : (idx - 1 >= 0 ? sorted[idx - 1] : CreateStacked(sorted[0], -1));
-        SetActiveStorey(target);
+        ClearSelection();
+        List<StoreyData> sorted = SortedStoreys(); // ascending by base elevation
+        StoreyData next = null;
+        if (dir > 0)
+        {
+            foreach (StoreyData s in sorted)
+                if (s.BaseElevation > _drawHeight + 0.001f) { next = s; break; }
+        }
+        else
+        {
+            for (int i = sorted.Count - 1; i >= 0; i--)
+                if (sorted[i].BaseElevation < _drawHeight - 0.001f) { next = sorted[i]; break; }
+        }
+        SetDrawHeight(next?.BaseElevation ?? _drawHeight + dir * Document.DefaultStoreyHeight);
     }
 
     private List<StoreyData> SortedStoreys()
@@ -134,33 +177,19 @@ public sealed class EditorContext
         return list;
     }
 
-    /// <summary>New storey flush above (dir=+1) or below (dir=-1) <paramref name="from"/>, inheriting its height.</summary>
-    private StoreyData CreateStacked(StoreyData from, int dir)
-    {
-        float height = from.Height;
-        float baseElev = dir > 0 ? from.BaseElevation + from.Height : from.BaseElevation - height;
-        var s = new StoreyData
-        {
-            Id = Ids.New(),
-            Name = $"Storey {baseElev:0.##} m",
-            BaseElevation = baseElev,
-            Height = height,
-        };
-        Document.Storeys.Add(s);
-        return s;
-    }
-
     public BuildContext BuildCtx() => new()
     {
         Materials = Document.Materials,
         CellSize = Document.Grid.CellSize,
-        StoreyHeight = Storey.Height,
+        StoreyHeight = Document.DefaultStoreyHeight,
     };
 
     public void AddInstance(PrimitiveInstanceData instance)
     {
         DefaultMaterials.ApplyDefaults(instance); // give freshly drawn geometry placeholder textures (no picker UI yet)
-        Commands.Execute(new AddInstanceCommand(Storey, instance, Refresh));
+        // The instance is built at Origin.Y = 0; it lands in the layer at the current draw height (created
+        // lazily by the command if none exists there yet), whose base IS that height — so no Y baking needed.
+        Commands.Execute(new AddInstanceCommand(Document, _drawHeight, Document.DefaultStoreyHeight, instance, Refresh));
     }
 
     /// <summary>

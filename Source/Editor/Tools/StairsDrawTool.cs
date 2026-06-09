@@ -56,7 +56,7 @@ public sealed class StairsDrawTool : DrawToolBase
         float run = d.Length();
         if (run < MinLength) return null;
 
-        float rise = Ctx.Storey.Height;
+        float rise = Ctx.DefaultStoreyHeight;
         int steps = Mathf.Max(1, Mathf.RoundToInt(rise / TargetRiser));
 
         float width = Ctx.Document.Grid.CellSize; // one cell wide → edges land on grid lines
