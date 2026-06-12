@@ -6,11 +6,11 @@ LevelBuilder is a standalone Godot 4.6 / C# app. It edits a **Level** (a buildin
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ UI            Toolbar · Palette · Inspector · StoreySelector   │
-│               · MaterialPicker            (Godot Control nodes) │
+│ UI            SceneTree · Inspector · PrimitivePalette ·       │
+│               TexturePalette · Project    (Godot Control nodes) │
 ├──────────────────────────────────────────────────────────────┤
-│ Editor        Camera rig · Tool state machine (Select/         │
-│               FloorDraw/WallDraw/Place) · Selection · Gizmos    │
+│ Editor        Camera rig · Tool state machine (Select · per-   │
+│               primitive Draw tools · Opening) · Gizmos          │
 │               · Command stack (undo/redo)                       │
 ├──────────────────────────────────────────────────────────────┤
 │ Core          Data model (Resources) · Primitive registry +    │
@@ -54,13 +54,15 @@ LevelBuilder is a standalone Godot 4.6 / C# app. It edits a **Level** (a buildin
 | `Core/Data` | The serializable level graph | `LevelDocument`, `StoreyData`, `PrimitiveInstanceData`, `MaterialLibrary`, `OpeningData` |
 | `Core/Primitives` | Parametric building blocks | `IPrimitive`/`PrimitiveDefinition`, `PrimitiveRegistry`, concrete primitives |
 | `Core/Geometry` | Low-level mesh helpers | `MeshBuilder` (quads/boxes/extrude/revolve), wall box-decomposition |
-| `Core/Grid` | Grid math & snapping | `GridModel`, `Snapper` |
-| `Core/Build` | Persistence + bake | `LevelSerializer` (.tres), `SceneBaker` (.tscn) |
+| `Core/Grid` | Grid math & snapping | `GridPlane`, `Snapper` |
+| `Core/Build` | Persistence + bake | `LevelSerializer` (.tres), `SceneBaker` (.tscn), `MaterialResolver`, `ResourceIo` |
 | `Editor/Camera` | Viewport navigation | `EditorCameraRig` (orbit/pan/zoom) |
-| `Editor/Tools` | Interaction modes | `ITool`, `ToolManager`, `SelectTool`, `FloorDrawTool`, `WallDrawTool`, `PlaceTool` |
-| `Editor/Commands` | Undo/redo | `ICommand`, `CommandStack` |
-| `Editor/Selection` | Selection + gizmos | `SelectionSet`, transform gizmos |
-| `UI` | Panels & widgets (native Control nodes, built in code) | `SceneTreePanel`, `InspectorPanel`, `PrimitivePalettePanel`, `TexturePalettePanel`, drag-drop (`TextureSwatch`/`TextureDropZone`/`ViewportDropOverlay`) |
+| `Editor/Tools` | Interaction modes | `ITool`, `ToolManager`, `SelectTool`, `DrawToolBase` + per-primitive draw tools, `OpeningTool` |
+| `Editor/Commands` | Undo/redo | `ICommand`, `CommandStack`, `MacroCommand`, the `*Instance`/`*Opening`/`*Material` commands |
+| `Editor/Gizmos` | Move/resize handles | `IEditHandle`, `InstanceMoveHandle`/`AxisResizeHandle`/`MultiMoveHandle`, opening handles |
+| `Editor/View` + `Editor/Grid` | Live 3D preview | `LevelView` (regenerates touched meshes), `GridRenderer`, `GridCursor` |
+| `Editor/Session` | Editor state hub | `EditorContext` (document, selection, command facade), `InstancePicker` |
+| `UI` | Panels & widgets (native Control nodes, built in code) | `SceneTreePanel`, `InspectorPanel`, `PrimitivePalettePanel`, `TexturePalettePanel`, `ProjectPanel`, drag-drop (`TextureSwatch`/`TextureDropZone`/`ViewportDropOverlay`) |
 
 ## Key design decisions (and why)
 

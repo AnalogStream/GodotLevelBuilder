@@ -2,13 +2,15 @@
 
 Build order is chosen to **prove the riskiest integrations first** (C# nested-Resource serialization, and the bake pipeline), then add breadth. Don't build ten primitives before the spine works end to end.
 
-> **Status (current):** M1–M4 done and F5-verified. Primitive breadth (M6) partly done — floor, wall,
-> ramp, stairs, ramp-plane, stair-plane. Editor UI now exists (native Control nodes, see `UI.md`):
-> scene-tree dock, primitive/opening palette, right inspector, and a **texture library with
-> drag-drop** (onto the inspector slot or the 3D object) covering most of M5. Openings-as-objects
-> (the "Next up" item below) is done. Remaining headline gaps: per-type/default material assignment,
-> a full `ParamSpec`-driven inspector, arbitrary floor polygons, and the export override round-trip
-> check.
+> **Status (current):** M1–M4 done and F5-verified. Primitive breadth (M6) well underway — 12
+> primitives: floor, wall, curved-wall, cylinder, edge-curb, ramp, ramp-plane, stairs, stair-plane,
+> banked-curve, half-pipe, dome (see `PRIMITIVES.md`). Editor UI exists (native Control nodes, see
+> `UI.md`): scene-tree dock, primitive/opening palette, right inspector (with a **ParamSpec-driven
+> parameter editor**), a **texture library with drag-drop** (onto the inspector slot or the 3D
+> object) plus per-texture tiling/tint/**pixelate**, and a **Project** tab (workspace, save/open,
+> local bake, and **export-to-game** with inline-embedded textures). Openings-as-objects is done.
+> Remaining headline gaps: per-slot and per-type/default material assignment, arbitrary floor
+> polygons, and the export-override round-trip verification.
 
 ## Milestone 1 — The spine (one primitive, whole pipeline)
 
@@ -36,7 +38,7 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 - [ ] `WallPrimitive` with the box-decomposition mesh (no openings yet).
 - [ ] `WallDrawTool` (segment draw, snaps to grid edges).
 - [ ] Live preview: regenerate only touched instances on command apply.
-- [ ] `PrimitivePalette` (catalog from `PrimitiveRegistry`) + `Inspector` (params from `ParamSpec`).
+- [x] `PrimitivePalette` (catalog from `PrimitiveRegistry`) + `Inspector` (params from `ParamSpec`).
 
 ## Milestone 4 — Openings & frames
 
@@ -70,8 +72,9 @@ Exit criteria: `.tres` round-trips losslessly **and** the baked `.tscn` opens co
 - **Set-for-type materials** — apply a texture to all existing instances of a type AND persist a
   per-type default in `LevelDocument` (supersedes the hardcoded `DefaultMaterials.SlotsFor` for new
   draws; round-trips to `.tres`).
-- **ParamSpec-driven inspector** — generate editable fields (spinbox/checkbox/enum) per primitive
-  from its `ParamSpec`, plus per-slot material assignment.
+- **Per-slot material assignment** — the inspector now generates editable parameter fields from each
+  primitive's `ParamSpec` (done; spinbox/checkbox), and a drop paints the whole object. Remaining: a
+  per-*slot* material picker so e.g. a wall's `Front` and `Reveal` can differ.
 
 ### Done
 

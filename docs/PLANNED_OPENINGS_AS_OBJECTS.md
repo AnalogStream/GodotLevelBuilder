@@ -1,6 +1,10 @@
-# Planned: openings as editable objects
+# Openings as editable objects
 
-**Status:** designed, not implemented. Picks up after the current M4 (openings exist as `OpeningData` on a wall and are cut immediately on click).
+**Status: IMPLEMENTED.** Openings are now first-class selectable/movable/resizable editor objects
+(`AddOpeningCommand` / `EditOpeningCommand` / `RemoveOpeningCommand`; selection addresses an opening
+via `wallId`+`openingId`; the hole is suppressed while selected and applies on deselect/bake/save).
+The original design notes below are kept for context. Not-yet-done: real **frame trim** geometry
+(`OpeningData.FrameType`) — see the deferred note in `PRIMITIVES.md`.
 
 ## Goal
 

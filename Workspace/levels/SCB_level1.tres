@@ -5,7 +5,6 @@
 [ext_resource type="Script" path="res://Source/Core/Data/MaterialLibrary.cs" id="3_2vcku"]
 [ext_resource type="Script" path="res://Source/Core/Data/StoreyData.cs" id="4_ukaeo"]
 [ext_resource type="Script" path="res://Source/Core/Data/PrimitiveInstanceData.cs" id="5_y64t8"]
-[ext_resource type="Script" path="res://Source/Core/Data/OpeningData.cs" id="6_hcpq8"]
 [ext_resource type="Script" path="res://Source/Core/Data/LevelDocument.cs" id="6_sb37i"]
 
 [sub_resource type="Resource" id="Resource_klbqa"]
@@ -53,119 +52,10 @@ UvScale = 0.2
 script = ExtResource("3_2vcku")
 Entries = Array[ExtResource("2_hcpq8")]([SubResource("Resource_igrkq"), SubResource("Resource_02hb8"), SubResource("Resource_dyhmk"), SubResource("Resource_hcpq8"), SubResource("Resource_ukaeo"), SubResource("Resource_y64t8")])
 
-[sub_resource type="Resource" id="Resource_2vcku"]
-script = ExtResource("5_y64t8")
-Id = "5a6e1d69"
-PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
-Parameters = {
-"depth": 80.0,
-"thickness": 0.2,
-"width": 78.0
-}
-MaterialSlots = {
-"Bottom": "tex:textures/cobblestone_3.png",
-"Edge": "tex:textures/cobblestone_3.png",
-"Top": "tex:textures/cobblestone_3.png"
-}
-
-[sub_resource type="Resource" id="Resource_sb37i"]
-script = ExtResource("5_y64t8")
-Id = "c3f264ab"
-PrimitiveType = "wall"
-LocalTransform = Transform3D(-0.25242195, 0, -0.9676173, 0, 1, 0, 0.9676173, 0, -0.25242195, -31, 0, -9.5)
-Parameters = {
-"height": 3.0,
-"length": 23.769728,
-"thickness": 0.2
-}
-MaterialSlots = {
-"Back": "tex:textures/1K_Bricks.png",
-"Ends": "tex:textures/1K_Bricks.png",
-"Front": "tex:textures/1K_Bricks.png",
-"Reveal": "tex:textures/1K_Bricks.png",
-"Top": "tex:textures/1K_Bricks.png"
-}
-
-[sub_resource type="Resource" id="Resource_ca2v7"]
-script = ExtResource("5_y64t8")
-Id = "5ceb2720"
-PrimitiveType = "wall"
-LocalTransform = Transform3D(0.62469506, 0, -0.7808688, 0, 1, 0, 0.7808688, 0, 0.62469506, -30, 0, 7)
-Parameters = {
-"height": 3.0,
-"length": 12.806249,
-"thickness": 0.2
-}
-MaterialSlots = {
-"Back": "tex:textures/1K_Bricks.png",
-"Ends": "tex:textures/1K_Bricks.png",
-"Front": "tex:textures/1K_Bricks.png",
-"Reveal": "tex:textures/1K_Bricks.png",
-"Top": "tex:textures/1K_Bricks.png"
-}
-
-[sub_resource type="Resource" id="Resource_gg72i"]
-script = ExtResource("5_y64t8")
-Id = "0d93d69e"
-PrimitiveType = "wall"
-LocalTransform = Transform3D(0.8944272, 0, 0.4472136, 0, 1, 0, -0.4472136, 0, 0.8944272, -21, 0, 9.5)
-Parameters = {
-"height": 3.0,
-"length": 11.18034,
-"thickness": 0.2
-}
-MaterialSlots = {
-"Back": "tex:textures/1K_Bricks.png",
-"Ends": "tex:textures/1K_Bricks.png",
-"Front": "tex:textures/1K_Bricks.png",
-"Reveal": "tex:textures/1K_Bricks.png",
-"Top": "tex:textures/1K_Bricks.png"
-}
-
-[sub_resource type="Resource" id="Resource_7lw8m"]
-script = ExtResource("5_y64t8")
-Id = "cf7bbc9e"
-PrimitiveType = "half_pipe"
-LocalTransform = Transform3D(0.99905616, 0, -0.043437224, 0, 1, 0, 0.043437224, 0, 0.99905616, -7, 0, 41)
-Parameters = {
-"arc": 180.0,
-"curve": 270.0,
-"deck": true,
-"deckWidth": 1.0,
-"length": 30.000000001490115,
-"radius": 1.500000001490116,
-"rise": 3.0,
-"segments": 16,
-"sides": 12,
-"thickness": 0.2
-}
-MaterialSlots = {
-"Side": "tex:res://Assets/kenney_prototype_textures/orange/texture_10.png",
-"Surface": "tex:res://Assets/kenney_prototype_textures/orange/texture_10.png"
-}
-
-[sub_resource type="Resource" id="Resource_jsbgp"]
-script = ExtResource("5_y64t8")
-Id = "3db3499e"
-PrimitiveType = "floor"
-LocalTransform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.625, 0, 44.5)
-Parameters = {
-"depth": 9.0,
-"thickness": 0.2,
-"width": 28.75
-}
-MaterialSlots = {
-"Bottom": "tex:textures/cobblestone_3.png",
-"Edge": "tex:textures/cobblestone_3.png",
-"Top": "tex:textures/cobblestone_3.png"
-}
-
 [sub_resource type="Resource" id="Resource_rvsld"]
 script = ExtResource("4_ukaeo")
 Id = "272c8f70"
 Name = "Ground Floor"
-Instances = Array[ExtResource("5_y64t8")]([SubResource("Resource_2vcku"), SubResource("Resource_sb37i"), SubResource("Resource_ca2v7"), SubResource("Resource_gg72i"), SubResource("Resource_7lw8m"), SubResource("Resource_jsbgp")])
 
 [resource]
 script = ExtResource("6_sb37i")

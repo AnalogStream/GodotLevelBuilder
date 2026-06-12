@@ -37,7 +37,7 @@ Use the glossary from `CLAUDE.md`: **Level** (document), **Storey** (vertical la
 
 ## Files & assets
 
-- Scenes in `Scenes/`, code under `Source/`, sample assets under `Assets/`. (Migrate the template's `Models/Main.cs` when real work starts.)
+- Scenes in `Scenes/`, code under `Source/`, sample assets under `Assets/`. The entry point is `Source/App/Main.cs` (attached to `Scenes/Main.tscn`), which builds the whole editor UI in code.
 - Resource files: `snake_case` is fine for `.tres`/`.tscn` to match Godot defaults; C# files are `PascalCase.cs`.
 
 ## Commits

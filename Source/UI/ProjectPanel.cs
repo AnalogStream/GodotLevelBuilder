@@ -23,6 +23,7 @@ public partial class ProjectPanel : MarginContainer
     private Label _targetLabel;
     private LineEdit _nameEdit;
     private Button _exportButton;
+    private CheckBox _mergeExportCheck;
     private FileDialog _workspaceDialog;
     private FileDialog _openDialog;
     private FileDialog _targetDialog;
@@ -89,15 +90,26 @@ public partial class ProjectPanel : MarginContainer
         };
         targetRow.AddChild(_targetLabel);
         targetRow.AddChild(MakeButton("Set…", OpenTargetDialog));
-        _exportButton = MakeButton("Export to Game", () => _ctx.ExportToGame());
+        _exportButton = MakeButton("Export to Game", () => _ctx.ExportToGame(_mergeExportCheck.ButtonPressed));
         targetRow.AddChild(_exportButton);
         UpdateTargetLabel();
 
+        // Checked (default) = merged chunk. Unchecked = per-object tree, so individual pieces stay
+        // selectable/movable in the Godot editor (a merged trimesh is one fused, uneditable body).
+        _mergeExportCheck = new CheckBox
+        {
+            Text = "Merge into one chunk (uncheck to keep pieces editable in Godot)",
+            ButtonPressed = true,
+            FocusMode = Control.FocusModeEnum.None, // don't let the checkbox eat tool hotkeys
+        };
+        rows.AddChild(_mergeExportCheck);
+
         rows.AddChild(new Label
         {
-            Text = "Export = merged chunk written into the target project's levels/ folder, textures "
-                 + "embedded inline (self-contained, no res:// setup). Merged = one mesh per material "
-                 + "+ one precise trimesh collision; per-object material overrides collapse to per-material.",
+            Text = "Export = written into the target project's levels/ folder, textures embedded inline "
+                 + "(self-contained, no res:// setup). Merged = one mesh per material + one precise "
+                 + "trimesh collision (fewest draw calls; per-object material overrides collapse to "
+                 + "per-material). Unmerged = one MeshInstance3D + collision per primitive, fully editable.",
             Modulate = new Color(1, 1, 1, 0.55f),
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         });

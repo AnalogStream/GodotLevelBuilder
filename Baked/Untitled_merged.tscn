@@ -1,9 +1,9 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://boagqtd1r2loa"]
 
 [ext_resource type="Material" path="res://Assets/Materials/proto_floor.tres" id="1_8o1lx"]
 [ext_resource type="Material" path="res://Assets/Materials/proto_trim.tres" id="2_sr5xo"]
-[ext_resource type="Texture2D" path="res://Assets/user_textures/1K_Bricks.png" id="3_sr5xo"]
-[ext_resource type="Texture2D" path="res://Assets/user_textures/cobblestone_3.png" id="4_s62eh"]
+[ext_resource type="Texture2D" uid="uid://dbyluhb7f40sd" path="res://Assets/user_textures/1K_Bricks.png" id="3_sr5xo"]
+[ext_resource type="Texture2D" uid="uid://bjidjjat73nb2" path="res://Assets/user_textures/cobblestone_3.png" id="4_s62eh"]
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_7n56w"]
 _surfaces = [{

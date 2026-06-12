@@ -8,7 +8,7 @@ The editor UI is **native Godot `Control` nodes**, built entirely in code from `
 > Control nodes share Godot's input/focus/viewport system, so that coupling is free; an embedded
 > Avalonia layer would put the panels on a separate input plane and force manual coordination. The
 > one thing native costs us — rich data-bound inspectors — is recovered by generating fields from
-> each primitive's `ParamSpec` (planned).
+> each primitive's `ParamSpec` (done: bool → checkbox, float/int → spinbox, in `InspectorPanel`).
 
 ## Layout
 
@@ -65,14 +65,16 @@ flag prevents the programmatic re-selection from echoing back as a user click.
 
 ### InspectorPanel (right)
 Properties of the selected object. Identity (type + id); a **Texture** slot (`TextureDropZone`)
-showing the current texture and accepting a dropped swatch; **texture properties** (Tiling +
-Tint) for the current texture; and the selection's editable parameters (the primitive's
+showing the current texture and accepting a dropped swatch; **texture properties** (Tiling, Tint,
+and Pixelate) for the current texture; and the selection's editable parameters (the primitive's
 `ParamSpec`s, or an opening's offset/width/height/sill). Subscribes to `EditorContext.Changed`.
 
-- **Texture properties (Tiling/Tint)** are persistent controls under the texture slot, shown only
-  when the selection's primary slot points at a *texture* entry (a loaded `.material` has no editable
-  props here). They edit the shared `MaterialEntry` via `EditorContext.EditMaterial` →
-  `EditMaterialCommand` (undoable; affects every instance using that texture — see `DATA_MODEL.md`).
+- **Texture properties (Tiling / Tint / Pixelate)** are persistent controls under the texture slot,
+  shown only when the selection's primary slot points at a *texture* entry (a loaded `.material` has no
+  editable props here). Pixelate is a toggle + a "Pixels" size spinner (longest side in texels) that
+  only appears while the toggle is on. They edit the shared `MaterialEntry` via
+  `EditorContext.EditMaterial` → `EditMaterialCommand` (undoable; affects every instance using that
+  texture — see `DATA_MODEL.md`).
   Synced under `_suppress` like the parameter rows; being persistent (not rebuilt per selection) they
   avoid the QueueFree-inside-signal trap. Known minor: dragging the `ColorPickerButton` pushes one
   undo step per change.

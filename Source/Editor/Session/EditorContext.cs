@@ -508,11 +508,16 @@ public sealed class EditorContext
     }
 
     /// <summary>
-    /// Exports a merged chunk straight into the target game project (<c>&lt;target&gt;/levels/&lt;Name&gt;.tscn</c>)
-    /// with textures <b>embedded inline</b>, so the .tscn is self-contained and drops into that project
-    /// with no res:// dependency on the builder. Uses an absolute OS path outside this project.
+    /// Exports straight into the target game project (<c>&lt;target&gt;/levels/&lt;Name&gt;.tscn</c>) with
+    /// textures <b>embedded inline</b>, so the .tscn is self-contained and drops into that project with
+    /// no res:// dependency on the builder. Uses an absolute OS path outside this project.
+    ///
+    /// <paramref name="merged"/> = true (default) writes a single merged chunk (one mesh per material +
+    /// one trimesh collision; fewest draw calls). false writes the per-object tree (one MeshInstance3D
+    /// per primitive + per-object collision shapes) so individual pieces stay selectable/movable in the
+    /// Godot editor.
     /// </summary>
-    public void ExportToGame()
+    public void ExportToGame(bool merged = true)
     {
         if (Config == null || !Config.HasTarget)
         {
@@ -522,7 +527,10 @@ public sealed class EditorContext
         string dir = $"{Config.TargetProjectPath}/levels";
         EnsureDir(dir);
         string path = $"{dir}/{FileStem()}.tscn";
-        Error e = new SceneBaker(Registry).BakeMergedToFile(Document, path, embedTextures: true);
+        var baker = new SceneBaker(Registry);
+        Error e = merged
+            ? baker.BakeMergedToFile(Document, path, embedTextures: true)
+            : baker.BakeToFile(Document, path, embedTextures: true);
         Report("export", path, e);
     }
 
