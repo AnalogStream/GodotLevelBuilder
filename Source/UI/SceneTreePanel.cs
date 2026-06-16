@@ -37,7 +37,7 @@ public partial class SceneTreePanel : PanelContainer
     public void Setup(EditorContext ctx)
     {
         _ctx = ctx;
-        CustomMinimumSize = new Vector2(240, 0);
+        CustomMinimumSize = new Vector2(UiConstants.SceneTreeWidth, 0);
 
         var vbox = new VBoxContainer();
         AddChild(vbox);
@@ -280,7 +280,6 @@ public partial class SceneTreePanel : PanelContainer
     private static string OpeningLabel(OpeningData o)
         => $"{(o.SillHeight > 0 ? "Window" : "Door")}  ({Short(o.Id)})";
 
-    /// <summary>Last 4 chars of an id, for a compact disambiguator.</summary>
-    private static string Short(string id)
-        => string.IsNullOrEmpty(id) ? "?" : id.Length <= 4 ? id : id[^4..];
+    /// <summary>Last 4 chars of an id, for a compact disambiguator (tree rows stay narrow).</summary>
+    private static string Short(string id) => UiFactory.ShortId(id, 4);
 }

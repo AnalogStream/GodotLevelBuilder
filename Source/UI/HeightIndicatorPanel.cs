@@ -40,9 +40,8 @@ public partial class HeightIndicatorPanel : PanelContainer
         var row = new HBoxContainer();
         vbox.AddChild(row);
 
-        var down = new Button { Text = "▼", FocusMode = Control.FocusModeEnum.None, TooltipText = "Lower draw height one step" };
-        down.Pressed += () => _ctx.NudgeDrawHeight(-1);
-        row.AddChild(down);
+        row.AddChild(UiFactory.MakeButton("▼", () => _ctx.NudgeDrawHeight(-1),
+            UiConstants.SmallButtonMin, "Lower draw height one step"));
 
         _readout = new Label
         {
@@ -56,9 +55,8 @@ public partial class HeightIndicatorPanel : PanelContainer
         _readout.GuiInput += OnReadoutGuiInput;
         row.AddChild(_readout);
 
-        var up = new Button { Text = "▲", FocusMode = Control.FocusModeEnum.None, TooltipText = "Raise draw height one step" };
-        up.Pressed += () => _ctx.NudgeDrawHeight(+1);
-        row.AddChild(up);
+        row.AddChild(UiFactory.MakeButton("▲", () => _ctx.NudgeDrawHeight(+1),
+            UiConstants.SmallButtonMin, "Raise draw height one step"));
 
         // Step row: the nudge/scrub increment (persists in the document's GridSettings).
         var stepRow = new HBoxContainer();
@@ -72,6 +70,7 @@ public partial class HeightIndicatorPanel : PanelContainer
             Suffix = "m",
         };
         _step.ValueChanged += OnStepChanged;
+        UiFactory.ReleaseFocusOnSubmit(_step);
         stepRow.AddChild(_step);
 
         _storey = new Label { Modulate = new Color(1, 1, 1, 0.6f) };
@@ -79,6 +78,11 @@ public partial class HeightIndicatorPanel : PanelContainer
 
         ctx.Changed += Refresh; // storey switch / height change / doc swap all refire this
         Refresh();
+    }
+
+    public override void _ExitTree()
+    {
+        if (_ctx != null) _ctx.Changed -= Refresh;
     }
 
     /// <summary>Blender-style scrub: hold LMB on the readout and drag vertically (up = raise).</summary>

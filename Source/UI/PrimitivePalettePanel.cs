@@ -43,10 +43,7 @@ public partial class PrimitivePalettePanel : MarginContainer
     {
         _tools = tools;
 
-        AddThemeConstantOverride("margin_left", 8);
-        AddThemeConstantOverride("margin_top", 8);
-        AddThemeConstantOverride("margin_right", 8);
-        AddThemeConstantOverride("margin_bottom", 8);
+        UiFactory.ApplyMargin(this);
 
         var scroll = new ScrollContainer
         {
@@ -68,7 +65,7 @@ public partial class PrimitivePalettePanel : MarginContainer
                      .OrderBy(g => CategoryOrder.GetValueOrDefault(g.Key, int.MaxValue))
                      .ThenBy(g => g.Key))
         {
-            rows.AddChild(new Label { Text = category.Key, Modulate = new Color(1, 1, 1, 0.6f) });
+            rows.AddChild(UiFactory.Section(category.Key));
 
             var flow = new HFlowContainer();
             rows.AddChild(flow);
@@ -87,13 +84,15 @@ public partial class PrimitivePalettePanel : MarginContainer
 
     private Button MakeButton(Entry e)
     {
+        string hotkey = _tools.HotkeyFor(e.Id);
         var button = new Button
         {
             Text = e.Label,
             ToggleMode = true,
             ButtonGroup = _group,
             FocusMode = FocusModeEnum.None, // don't let a pressed button eat tool hotkeys
-            CustomMinimumSize = new Vector2(96, 36),
+            CustomMinimumSize = UiConstants.ButtonMin,
+            TooltipText = hotkey != null ? $"{e.Label} ({hotkey})" : e.Label,
         };
         string id = e.Id;
         button.Pressed += () => { if (!_suppressSignal) _tools.ActivateToolById(id); };
@@ -101,14 +100,16 @@ public partial class PrimitivePalettePanel : MarginContainer
         return button;
     }
 
-    /// <summary>Reflect the tool manager's active tool without re-triggering activation.</summary>
+    /// <summary>Reflect the tool manager's active tool without re-triggering activation.
+    /// Unpress everything first: SetPressedNoSignal bypasses the ButtonGroup's exclusivity
+    /// (only real clicks enforce it), so a hotkey switch would otherwise leave the previous
+    /// tool's button stuck highlighted.</summary>
     private void OnActiveToolIdChanged(string id)
     {
         _suppressSignal = true;
+        foreach (Button b in _buttonsById.Values) b.SetPressedNoSignal(false);
         if (id != null && _buttonsById.TryGetValue(id, out Button button))
             button.SetPressedNoSignal(true);
-        else
-            foreach (Button b in _buttonsById.Values) b.SetPressedNoSignal(false); // Select tool
         _suppressSignal = false;
     }
 }

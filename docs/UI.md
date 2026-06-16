@@ -13,19 +13,56 @@ The editor UI is **native Godot `Control` nodes**, built entirely in code from `
 ## Layout
 
 ```
-VSplitContainer  (full rect)
-├─ HSplitContainer                         ← top row
-│   ├─ SceneTreePanel        (left dock,  Storey ▸ Primitive ▸ Opening)
-│   └─ HSplitContainer
-│       ├─ ViewportDropContainer  (3D view, expands)
-│       └─ InspectorPanel     (right dock, selected object's properties)
-└─ TabContainer  (bottom dock, min height 180)
-    ├─ PrimitivePalettePanel   "Primitives"  (draw tools, grouped by category)
-    ├─ TexturePalettePanel     "Textures"    (the texture library — drag sources)
-    └─ ProjectPanel            "Project"     (workspace, New/Open/Save, bake + export-to-game)
+Control "UiRoot"  (full rect, Theme = UiTheme.Build() — the app-wide dark theme)
+├─ VBoxContainer (shell)
+│   ├─ MenuBarPanel            File / Edit / View / Help
+│   ├─ VSplitContainer  (expands)
+│   │   ├─ HSplitContainer                         ← top row
+│   │   │   ├─ SceneTreePanel        (left dock,  Storey ▸ Primitive ▸ Opening)
+│   │   │   └─ HSplitContainer
+│   │   │       ├─ ViewportDropContainer  (3D view, expands)
+│   │   │       └─ InspectorPanel     (right dock, selected object's properties)
+│   │   └─ TabContainer  (bottom dock, min height UiConstants.BottomDockHeight)
+│   │       ├─ PrimitivePalettePanel   "Primitives"  (draw tools, grouped by category)
+│   │       ├─ TexturePalettePanel     "Textures"    (the texture library — drag sources)
+│   │       └─ ProjectPanel            "Project"     (workspace, New/Open/Save, bake + export-to-game)
+│   └─ StatusBar               active tool · draw height · selection count · controls hint
+├─ ToastLayer                  bottom-right notifications (MouseFilter Ignore — never blocks input)
+└─ HelpOverlay                 F1 hotkey cheat sheet (hidden by default; click closes)
 ```
 
 `TabContainer` uses each child's `Name` as the tab title.
+
+### Theme, constants, factories
+
+- **`UiTheme.Build()`** — the dark theme, built in code (no `.tres`) and set once on `UiRoot`;
+  Godot propagates it down the whole Control branch. The SubViewport's rendered 3D image is
+  unaffected (Theme only touches Control drawing — never set `Modulate` on the viewport container).
+- **`UiConstants`** — dock sizes, margins, the accent color, toast colors. No per-panel magic numbers.
+- **`UiFactory`** — shared `MakeButton` (FocusMode None), `Section`, `ApplyMargin`, `MakeFileDialog`,
+  `ShortId`, and `ReleaseFocusOnSubmit` (SpinBoxes give keyboard focus back on Enter so the tool
+  hotkeys keep working; clicking the 3D view also force-releases GUI focus, see ToolManager).
+
+### Menu bar: click-only by design
+
+Menu items show their shortcuts **cosmetically in the label** but do not register accelerators —
+`ToolManager._UnhandledInput` stays the single owner of every contested key (Ctrl+S/Z/Y/B, Delete).
+A real `PopupMenu` accelerator fires even while a SpinBox/LineEdit has focus, which would e.g.
+delete the selected *object* while editing text. The one exception is **F1** (Help → Hotkey
+Reference): nothing else owns it, so it is a real accelerator and works regardless of focus.
+
+### Notifications, dirty tracking, safety
+
+- `EditorContext.Notified(NotifyLevel, msg)` (enum lives in `Editor/Session` so the context never
+  references UI types) → Main subscribes → `ToastLayer.Show`. Save/bake/export results and
+  missing-config warnings surface as toasts; `GD.Print` keeps the console mirror.
+- `CommandStack.IsDirty` uses a **save-marker reference** (the command on top of the undo stack at
+  the last save), so undoing back to the save point correctly returns to clean. `SaveSource`
+  success calls `MarkSaved()`. Window title shows `LevelBuilder — <name>*`.
+- `Main.ConfirmIfDirty(proceed)` — shared Save / Discard / Cancel dialog used by window close
+  (`AutoAcceptQuit = false` + `NotificationWMCloseRequest`), the File menu and the Project tab's
+  New/Open. Known accepted gap: document name + grid height-step edits bypass the command stack
+  (metadata / view prefs) and never dirty.
 
 ## The 3D view lives in a SubViewport
 

@@ -26,6 +26,11 @@ namespace LevelBuilder.App;
 /// </summary>
 public partial class Main : Node3D
 {
+    private EditorContext _ctx;
+    private Control _uiRoot;
+    private ConfirmationDialog _confirmDialog;
+    private System.Action _pendingAction; // what to run once the unsaved-changes dialog resolves
+
     public override void _Ready()
     {
         GD.Print("=== LevelBuilder — editor shell (docked scene tree) ===");
@@ -91,16 +96,37 @@ public partial class Main : Node3D
         var palette = new PrimitivePalettePanel { Name = "Primitives" };
         var textures = new TexturePalettePanel { Name = "Textures" };
         var project = new ProjectPanel { Name = "Project" };
-        var bottomTabs = new TabContainer { CustomMinimumSize = new Vector2(0, 180) };
+        var bottomTabs = new TabContainer { CustomMinimumSize = new Vector2(0, UiConstants.BottomDockHeight) };
         bottomTabs.AddChild(palette);
         bottomTabs.AddChild(textures);
         bottomTabs.AddChild(project);
 
-        var outer = new VSplitContainer();
-        outer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var outer = new VSplitContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
         outer.AddChild(split);       // top: viewport row (expands)
         outer.AddChild(bottomTabs);  // bottom: tabbed dock
-        AddChild(outer);
+
+        // App shell: menu bar (top) / split layout (middle) / status bar (bottom), all inside one
+        // themed root Control. The Theme propagates to every panel; the SubViewport's rendered 3D
+        // image is unaffected (Theme only touches Control drawing — never Modulate the container).
+        var menuBar = new MenuBarPanel();
+        var statusBar = new StatusBar();
+        var shell = new VBoxContainer();
+        shell.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        shell.AddChild(menuBar);
+        shell.AddChild(outer);
+        shell.AddChild(statusBar);
+
+        var uiRoot = new Control { Name = "UiRoot", Theme = UiTheme.Build() };
+        uiRoot.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        uiRoot.AddChild(shell);
+        _uiRoot = uiRoot;
+
+        // Overlays above the shell: toasts (never block input) + the F1 help sheet — inherit the theme.
+        var toasts = new ToastLayer { Name = "Toasts" };
+        var helpOverlay = new HelpOverlay { Name = "Help" };
+        uiRoot.AddChild(toasts);
+        uiRoot.AddChild(helpOverlay);
+        AddChild(uiRoot);
 
         var ctx = new EditorContext
         {
@@ -114,12 +140,14 @@ public partial class Main : Node3D
             Gizmos = gizmos,
             Config = config,
         };
+        _ctx = ctx;
         ctx.ReplaceDocument(doc);    // set the initial document BEFORE panels read ctx.Document in their Setup
         sceneTree.Setup(ctx);        // panels self-populate here and subscribe for later Changed events
         inspector.Setup(ctx);
         viewportContainer.Setup(viewport, ctx.AssignTextureFromDrop); // drop a swatch onto an object (whole selection if it's part of one)
         tools.Setup(ctx);
         ctx.CancelActiveTool = tools.CancelActive; // so a document swap cancels a half-drawn primitive (and a height change)
+        ctx.Notified += toasts.Show;               // save/bake/export feedback as toasts (console keeps its mirror)
 
         // Draw-height indicator: a corner Control over the 3D view (not inside the SubViewport). Added
         // AFTER the drop overlay so it stays the topmost child and its scrub drag isn't intercepted.
@@ -128,12 +156,78 @@ public partial class Main : Node3D
         heightIndicator.Setup(ctx);
         palette.Setup(registry, tools); // after tools.Setup so the primitive->tool map exists
         textures.Setup();
-        project.Setup(ctx, config, textures.Refresh); // Change-workspace repopulates the texture palette
+        project.Setup(ctx, config, textures.Refresh, ConfirmIfDirty); // Change-workspace repopulates the texture palette
+        statusBar.Setup(ctx, tools);
+        menuBar.Setup(ctx,
+            requestNew: () => ConfirmIfDirty(() => ctx.NewLevel()),
+            requestOpen: () => ConfirmIfDirty(project.ShowOpenDialog),
+            requestQuit: RequestQuit,
+            toggleTopDown: cameraRig.ToggleTopDown,
+            toggleHelp: helpOverlay.Toggle);
+
+        // Intercept window close so unsaved work prompts instead of silently quitting.
+        GetTree().AutoAcceptQuit = false;
+
+        // Window title tracks the open level + a dirty marker ("LevelBuilder — Name*").
+        System.Action updateTitle = () =>
+            GetWindow().Title = $"LevelBuilder — {ctx.Document.Name}{(ctx.IsDirty ? "*" : "")}";
+        ctx.Changed += updateTitle;            // document swap / rename
+        ctx.Commands.DirtyChanged += updateTitle; // edit / undo / save
+        updateTitle();
 
         // Resume where we left off: reopen the last saved level if it still exists.
         if (config.HasWorkspace && !string.IsNullOrEmpty(config.LastLevelPath)
             && FileAccess.FileExists(config.LastLevelPath))
             ctx.OpenLevel(config.LastLevelPath);
+    }
+
+    public override void _Notification(int what)
+    {
+        // AutoAcceptQuit is off: the X button lands here so unsaved work can prompt first.
+        if (what == NotificationWMCloseRequest) RequestQuit();
+    }
+
+    private void RequestQuit() => ConfirmIfDirty(() => GetTree().Quit());
+
+    /// <summary>
+    /// Runs <paramref name="proceed"/> immediately when there are no unsaved changes; otherwise
+    /// shows a Save / Discard / Cancel dialog first. Shared by window-close, the File menu and the
+    /// Project tab's New/Open.
+    /// </summary>
+    private void ConfirmIfDirty(System.Action proceed)
+    {
+        if (!_ctx.IsDirty) { proceed(); return; }
+
+        if (_confirmDialog == null)
+        {
+            _confirmDialog = new ConfirmationDialog
+            {
+                Title = "Unsaved changes",
+                DialogText = "The level has unsaved changes.",
+                OkButtonText = "Save",
+            };
+            _confirmDialog.AddButton("Discard", true, "discard");
+            _confirmDialog.Confirmed += () =>
+            {
+                _ctx.SaveSource();
+                System.Action pending = _pendingAction;
+                _pendingAction = null;
+                if (!_ctx.IsDirty) pending?.Invoke(); // save can fail (e.g. no workspace) — then stay put
+            };
+            _confirmDialog.CustomAction += action =>
+            {
+                if (action != "discard") return;
+                _confirmDialog.Hide();
+                System.Action pending = _pendingAction;
+                _pendingAction = null;
+                pending?.Invoke();
+            };
+            _confirmDialog.Canceled += () => _pendingAction = null;
+            _uiRoot.AddChild(_confirmDialog);
+        }
+
+        _pendingAction = proceed;
+        _confirmDialog.PopupCentered();
     }
 
     private static LevelDocument NewDocument(out StoreyData storey)

@@ -19,6 +19,7 @@ public partial class ToolManager : Node
     /// <summary>Palette id -> the tool it activates. Covers draw-primitive tools AND openings (door/window).</summary>
     private Dictionary<string, ITool> _toolsById;
     private Dictionary<ITool, string> _idByTool;
+    private Dictionary<string, string> _hotkeyById;
 
     /// <summary>
     /// Fires when the active tool changes, carrying the palette id of the tool (a primitive TypeId,
@@ -85,12 +86,20 @@ public partial class ToolManager : Node
         _idByTool = new Dictionary<ITool, string>();
         foreach (var (id, tool) in _toolsById) _idByTool[tool] = id;
 
+        _hotkeyById = new Dictionary<string, string>();
+        foreach (var (key, tool) in _tools)
+            if (_idByTool.TryGetValue(tool, out string id))
+                _hotkeyById[id] = key.ToString();
+
         GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Cancels any in-progress tool operation (e.g. a half-drawn primitive) before a
     /// document swap, so a dangling draw can't reference the old document.</summary>
     public void CancelActive() => _active?.OnCancel();
+
+    /// <summary>Hotkey letter for a palette tool id, or null — used for palette tooltips/help.</summary>
+    public string HotkeyFor(string id) => _hotkeyById?.GetValueOrDefault(id);
 
     /// <summary>Activate a tool by its palette id (palette click). No-op if unknown.</summary>
     public void ActivateToolById(string id)
@@ -107,6 +116,10 @@ public partial class ToolManager : Node
                 HandleKey(k);
                 break;
             case InputEventMouseButton mb when mb.Pressed && mb.ButtonIndex == MouseButton.Left:
+                // Clicking the 3D view releases any focused panel control (SpinBox/LineEdit),
+                // otherwise its focus keeps eating tool hotkeys. Panels live in the MAIN window's
+                // GUI, not this SubViewport, so query the root viewport's focus owner.
+                GetTree().Root.GuiGetFocusOwner()?.ReleaseFocus();
                 _active?.OnClick();
                 GetViewport().SetInputAsHandled();
                 break;

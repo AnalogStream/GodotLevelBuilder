@@ -57,7 +57,9 @@ public partial class EditorCameraRig : Node3D
         }
     }
 
-    private void ToggleTopDown()
+    /// <summary>Orthographic straight-down view for floor-plan layout; toggling back restores the
+    /// previous orbit. Bound to 7 here; also callable from the View menu.</summary>
+    public void ToggleTopDown()
     {
         if (!_topDown)
         {

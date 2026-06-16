@@ -22,10 +22,7 @@ public partial class TexturePalettePanel : MarginContainer
 
     public void Setup()
     {
-        AddThemeConstantOverride("margin_left", 8);
-        AddThemeConstantOverride("margin_top", 8);
-        AddThemeConstantOverride("margin_right", 8);
-        AddThemeConstantOverride("margin_bottom", 8);
+        UiFactory.ApplyMargin(this);
 
         var outer = new VBoxContainer
         {
@@ -34,13 +31,9 @@ public partial class TexturePalettePanel : MarginContainer
         };
         AddChild(outer);
 
-        var addButton = new Button
-        {
-            Text = "Add texture…",
-            FocusMode = FocusModeEnum.None, // don't let it eat tool hotkeys after a click
-            SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
-        };
-        addButton.Pressed += OpenDialog;
+        Button addButton = UiFactory.MakeButton("Add texture…", OpenDialog,
+            tooltip: "Import image files (copied into the workspace's textures/ folder).");
+        addButton.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
         outer.AddChild(addButton);
 
         var scroll = new ScrollContainer
@@ -82,7 +75,7 @@ public partial class TexturePalettePanel : MarginContainer
 
         foreach (IGrouping<string, TextureItem> group in items.GroupBy(i => i.Group).OrderBy(g => g.Key))
         {
-            _rows.AddChild(new Label { Text = group.Key, Modulate = new Color(1, 1, 1, 0.6f) });
+            _rows.AddChild(UiFactory.Section(group.Key));
 
             var flow = new HFlowContainer();
             _rows.AddChild(flow);
@@ -100,18 +93,11 @@ public partial class TexturePalettePanel : MarginContainer
     {
         if (_dialog == null)
         {
-            _dialog = new FileDialog
-            {
-                Access = FileDialog.AccessEnum.Filesystem, // browse the whole disk, not just res://
-                FileMode = FileDialog.FileModeEnum.OpenFiles,
-                Title = "Add textures",
-                UseNativeDialog = true,
-            };
+            _dialog = UiFactory.MakeFileDialog(this, FileDialog.FileModeEnum.OpenFiles, "Add textures");
             _dialog.AddFilter("*.png,*.jpg,*.jpeg,*.webp,*.bmp,*.tga", "Images");
             _dialog.FilesSelected += OnFilesSelected;
-            AddChild(_dialog);
         }
-        _dialog.PopupCentered(new Vector2I(900, 600));
+        UiFactory.ShowDialog(_dialog);
     }
 
     private void OnFilesSelected(string[] paths)

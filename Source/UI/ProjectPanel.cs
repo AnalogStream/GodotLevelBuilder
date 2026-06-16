@@ -18,6 +18,7 @@ public partial class ProjectPanel : MarginContainer
     private EditorContext _ctx;
     private AppConfig _config;
     private System.Action _onWorkspaceChanged;
+    private System.Action<System.Action> _confirmIfDirty;
 
     private Label _workspaceLabel;
     private Label _targetLabel;
@@ -28,16 +29,15 @@ public partial class ProjectPanel : MarginContainer
     private FileDialog _openDialog;
     private FileDialog _targetDialog;
 
-    public void Setup(EditorContext ctx, AppConfig config, System.Action onWorkspaceChanged)
+    public void Setup(EditorContext ctx, AppConfig config, System.Action onWorkspaceChanged,
+        System.Action<System.Action> confirmIfDirty = null)
     {
         _ctx = ctx;
         _config = config;
         _onWorkspaceChanged = onWorkspaceChanged;
+        _confirmIfDirty = confirmIfDirty;
 
-        AddThemeConstantOverride("margin_left", 8);
-        AddThemeConstantOverride("margin_top", 8);
-        AddThemeConstantOverride("margin_right", 8);
-        AddThemeConstantOverride("margin_bottom", 8);
+        UiFactory.ApplyMargin(this);
 
         var rows = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         AddChild(rows);
@@ -53,7 +53,8 @@ public partial class ProjectPanel : MarginContainer
             VerticalAlignment = VerticalAlignment.Center,
         };
         wsRow.AddChild(_workspaceLabel);
-        wsRow.AddChild(MakeButton("Change…", OpenWorkspaceDialog));
+        wsRow.AddChild(UiFactory.MakeButton("Change…", OpenWorkspaceDialog,
+            tooltip: "Pick the folder where levels (.tres) and custom textures are stored."));
         UpdateWorkspaceLabel();
 
         // --- Level (New / Open / Save) ---
@@ -68,15 +69,20 @@ public partial class ProjectPanel : MarginContainer
         };
         _nameEdit.TextSubmitted += OnNameSubmitted;
         levelRow.AddChild(_nameEdit);
-        levelRow.AddChild(MakeButton("New", () => _ctx.NewLevel()));
-        levelRow.AddChild(MakeButton("Open…", OpenLevelDialog));
-        levelRow.AddChild(MakeButton("Save", SaveLevel));
+        levelRow.AddChild(UiFactory.MakeButton("New", () => Confirm(() => _ctx.NewLevel()),
+            tooltip: "Start a fresh empty level."));
+        levelRow.AddChild(UiFactory.MakeButton("Open…", () => Confirm(ShowOpenDialog),
+            tooltip: "Open a saved level (.tres) from the workspace."));
+        levelRow.AddChild(UiFactory.MakeButton("Save", SaveLevel,
+            tooltip: "Save the editable source (.tres) into the workspace (Ctrl+S)."));
 
         // --- Local bake (preview, inside this project) ---
         rows.AddChild(Section("Bake (local preview)"));
         var bakeRow = Row(rows);
-        bakeRow.AddChild(MakeButton("Bake (per-object)", () => _ctx.BakeToGodot()));
-        bakeRow.AddChild(MakeButton("Bake Merged Chunk", () => _ctx.BakeMergedToGodot()));
+        bakeRow.AddChild(UiFactory.MakeButton("Bake (per-object)", () => _ctx.BakeToGodot(),
+            tooltip: "Bake a .tscn with one MeshInstance3D + collision per primitive (Ctrl+B)."));
+        bakeRow.AddChild(UiFactory.MakeButton("Bake Merged Chunk", () => _ctx.BakeMergedToGodot(),
+            tooltip: "Bake one merged mesh per material + a single trimesh collision (fewest draw calls)."));
 
         // --- Export to the target game project ---
         rows.AddChild(Section("Export to game"));
@@ -89,8 +95,10 @@ public partial class ProjectPanel : MarginContainer
             VerticalAlignment = VerticalAlignment.Center,
         };
         targetRow.AddChild(_targetLabel);
-        targetRow.AddChild(MakeButton("Set…", OpenTargetDialog));
-        _exportButton = MakeButton("Export to Game", () => _ctx.ExportToGame(_mergeExportCheck.ButtonPressed));
+        targetRow.AddChild(UiFactory.MakeButton("Set…", OpenTargetDialog,
+            tooltip: "Choose the target Godot game project to export levels into."));
+        _exportButton = UiFactory.MakeButton("Export to Game", () => _ctx.ExportToGame(_mergeExportCheck.ButtonPressed),
+            tooltip: "Write a self-contained .tscn (textures embedded) into the target project's levels/ folder.");
         targetRow.AddChild(_exportButton);
         UpdateTargetLabel();
 
@@ -145,23 +153,24 @@ public partial class ProjectPanel : MarginContainer
             _nameEdit.Text = _ctx.Document.Name;
     }
 
-    private void OpenLevelDialog()
+    /// <summary>Unsaved-changes guard: runs <paramref name="action"/> via Main's confirm dialog when wired.</summary>
+    private void Confirm(System.Action action)
+    {
+        if (_confirmIfDirty != null) _confirmIfDirty(action);
+        else action();
+    }
+
+    /// <summary>Shows the open-level dialog (also reachable from the File menu).</summary>
+    public void ShowOpenDialog()
     {
         if (_openDialog == null)
         {
-            _openDialog = new FileDialog
-            {
-                Access = FileDialog.AccessEnum.Filesystem,
-                FileMode = FileDialog.FileModeEnum.OpenFile,
-                Title = "Open level",
-                UseNativeDialog = true,
-            };
+            _openDialog = UiFactory.MakeFileDialog(this, FileDialog.FileModeEnum.OpenFile, "Open level");
             _openDialog.AddFilter("*.tres", "Level source");
             _openDialog.FileSelected += path => _ctx.OpenLevel(path);
-            AddChild(_openDialog);
         }
         if (Workspace.IsSet) _openDialog.CurrentDir = Workspace.LevelsDir;
-        _openDialog.PopupCentered(new Vector2I(900, 600));
+        UiFactory.ShowDialog(_openDialog);
     }
 
     // ---- target game project --------------------------------------------
@@ -170,17 +179,11 @@ public partial class ProjectPanel : MarginContainer
     {
         if (_targetDialog == null)
         {
-            _targetDialog = new FileDialog
-            {
-                Access = FileDialog.AccessEnum.Filesystem,
-                FileMode = FileDialog.FileModeEnum.OpenDir,
-                Title = "Choose the target Godot game project folder",
-                UseNativeDialog = true,
-            };
+            _targetDialog = UiFactory.MakeFileDialog(this, FileDialog.FileModeEnum.OpenDir,
+                "Choose the target Godot game project folder");
             _targetDialog.DirSelected += OnTargetChosen;
-            AddChild(_targetDialog);
         }
-        _targetDialog.PopupCentered(new Vector2I(900, 600));
+        UiFactory.ShowDialog(_targetDialog);
     }
 
     private void OnTargetChosen(string dir)
@@ -202,17 +205,11 @@ public partial class ProjectPanel : MarginContainer
     {
         if (_workspaceDialog == null)
         {
-            _workspaceDialog = new FileDialog
-            {
-                Access = FileDialog.AccessEnum.Filesystem,
-                FileMode = FileDialog.FileModeEnum.OpenDir,
-                Title = "Choose a workspace folder",
-                UseNativeDialog = true,
-            };
+            _workspaceDialog = UiFactory.MakeFileDialog(this, FileDialog.FileModeEnum.OpenDir,
+                "Choose a workspace folder");
             _workspaceDialog.DirSelected += OnWorkspaceChosen;
-            AddChild(_workspaceDialog);
         }
-        _workspaceDialog.PopupCentered(new Vector2I(900, 600));
+        UiFactory.ShowDialog(_workspaceDialog);
     }
 
     private void OnWorkspaceChosen(string dir)
@@ -229,25 +226,12 @@ public partial class ProjectPanel : MarginContainer
 
     // ---- helpers ---------------------------------------------------------
 
-    private static Label Section(string text) =>
-        new() { Text = text, Modulate = new Color(1, 1, 1, 0.6f) };
+    private static Label Section(string text) => UiFactory.Section(text);
 
     private static HFlowContainer Row(Node parent)
     {
         var flow = new HFlowContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         parent.AddChild(flow);
         return flow;
-    }
-
-    private static Button MakeButton(string text, System.Action onPressed)
-    {
-        var button = new Button
-        {
-            Text = text,
-            FocusMode = FocusModeEnum.None, // don't let a focused button eat tool hotkeys
-            CustomMinimumSize = new Vector2(96, 36),
-        };
-        button.Pressed += onPressed;
-        return button;
     }
 }

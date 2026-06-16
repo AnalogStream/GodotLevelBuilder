@@ -89,6 +89,16 @@ public sealed class EditorContext
     public event System.Action Changed;
 
     /// <summary>
+    /// User-facing notifications (save/bake/export results, missing-config warnings). The UI layer
+    /// subscribes and shows toasts; the console keeps its GD.Print mirror. Same inversion pattern
+    /// as <see cref="CancelActiveTool"/> — the context never references UI types.
+    /// </summary>
+    public event System.Action<NotifyLevel, string> Notified;
+
+    /// <summary>True when the document has edits not yet saved (delegates to the command stack).</summary>
+    public bool IsDirty => Commands.IsDirty;
+
+    /// <summary>
     /// Re-syncs everything derived from selection + document state: the view's selection, the live
     /// mesh, and the gizmo handles. The single choke point for "the scene changed" — every command,
     /// selection change, and live drag frame routes through here, so the handle widgets track edits
@@ -453,11 +463,13 @@ public sealed class EditorContext
         if (doc == null)
         {
             GD.PrintErr($"[open] could not load {path}");
+            Notified?.Invoke(NotifyLevel.Error, $"Could not open {path.GetFile()}");
             return false;
         }
         ReplaceDocument(doc);
         CurrentLevelPath = path;
         RememberLastLevel(path);
+        Notified?.Invoke(NotifyLevel.Info, $"Opened {doc.Name}");
         return true;
     }
 
@@ -467,6 +479,7 @@ public sealed class EditorContext
         if (!Workspace.IsSet)
         {
             GD.PushWarning("[save] no workspace set — pick a workspace folder first (Project tab).");
+            Notified?.Invoke(NotifyLevel.Warning, "No workspace set — pick a folder in the Project tab first.");
             return;
         }
         EnsureDir(Workspace.LevelsDir);
@@ -477,6 +490,7 @@ public sealed class EditorContext
         {
             CurrentLevelPath = path;
             RememberLastLevel(path);
+            Commands.MarkSaved(); // this state is now the clean baseline for dirty tracking
         }
     }
 
@@ -522,6 +536,7 @@ public sealed class EditorContext
         if (Config == null || !Config.HasTarget)
         {
             GD.PushWarning("[export] no target game project set — pick one in the Project tab first.");
+            Notified?.Invoke(NotifyLevel.Warning, "No target game project set — pick one in the Project tab first.");
             return;
         }
         string dir = $"{Config.TargetProjectPath}/levels";
@@ -546,9 +561,20 @@ public sealed class EditorContext
         if (e != Error.Ok && e != Error.AlreadyExists) GD.PushWarning($"Could not create {dir}: {e}");
     }
 
-    private static void Report(string action, string path, Error e)
+    private void Report(string action, string path, Error e)
     {
-        if (e == Error.Ok) GD.Print($"[{action}] wrote {path}");
-        else GD.PrintErr($"[{action}] failed ({e}) for {path}");
+        if (e == Error.Ok)
+        {
+            GD.Print($"[{action}] wrote {path}");
+            Notified?.Invoke(NotifyLevel.Success, $"{Capitalize(action)} OK: {path.GetFile()}");
+        }
+        else
+        {
+            GD.PrintErr($"[{action}] failed ({e}) for {path}");
+            Notified?.Invoke(NotifyLevel.Error, $"{Capitalize(action)} failed ({e})");
+        }
     }
+
+    private static string Capitalize(string s)
+        => string.IsNullOrEmpty(s) ? s : $"{char.ToUpperInvariant(s[0])}{s[1..]}";
 }

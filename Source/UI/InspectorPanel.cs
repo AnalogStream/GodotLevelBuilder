@@ -47,13 +47,10 @@ public partial class InspectorPanel : PanelContainer
     public void Setup(EditorContext ctx)
     {
         _ctx = ctx;
-        CustomMinimumSize = new Vector2(260, 0);
+        CustomMinimumSize = new Vector2(UiConstants.InspectorWidth, 0);
 
         var margin = new MarginContainer();
-        margin.AddThemeConstantOverride("margin_left", 10);
-        margin.AddThemeConstantOverride("margin_top", 10);
-        margin.AddThemeConstantOverride("margin_right", 10);
-        margin.AddThemeConstantOverride("margin_bottom", 10);
+        UiFactory.ApplyMargin(margin, 10);
         AddChild(margin);
 
         var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -90,6 +87,7 @@ public partial class InspectorPanel : PanelContainer
             TooltipText = "Texture tiling: tiles per metre (higher = smaller, more-repeated tiles).",
         };
         _tilingSpin.ValueChanged += OnTiling;
+        UiFactory.ReleaseFocusOnSubmit(_tilingSpin);
         _tilingRow = MakeRow("Tiling", _tilingSpin);
         body.AddChild(_tilingRow);
 
@@ -122,6 +120,7 @@ public partial class InspectorPanel : PanelContainer
             TooltipText = "Pixelation resolution: the texture's longest side in texels (lower = chunkier).",
         };
         _pixelSizeSpin.ValueChanged += OnPixelSize;
+        UiFactory.ReleaseFocusOnSubmit(_pixelSizeSpin);
         _pixelSizeRow = MakeRow("Pixels", _pixelSizeSpin);
         body.AddChild(_pixelSizeRow);
 
@@ -345,14 +344,19 @@ public partial class InspectorPanel : PanelContainer
     // ---- widget helpers --------------------------------------------------
 
     /// <summary>SpinBox with finite bounds (ParamSpec min/max may be infinite — clamp to a sane range).</summary>
-    private static SpinBox BuildSpin(float min, float max, bool isInt) => new()
+    private static SpinBox BuildSpin(float min, float max, bool isInt)
     {
-        SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        MinValue = float.IsInfinity(min) ? (isInt ? 0 : -100000) : min,
-        MaxValue = float.IsInfinity(max) ? 100000 : max,
-        Step = isInt ? 1 : 0.01,
-        Rounded = isInt,
-    };
+        var sb = new SpinBox
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            MinValue = float.IsInfinity(min) ? (isInt ? 0 : -100000) : min,
+            MaxValue = float.IsInfinity(max) ? 100000 : max,
+            Step = isInt ? 1 : 0.01,
+            Rounded = isInt,
+        };
+        UiFactory.ReleaseFocusOnSubmit(sb); // typed-value commit gives the hotkeys back
+        return sb;
+    }
 
     private void AddRow(string label, Control field) => _propsBox.AddChild(MakeRow(label, field));
 
@@ -459,6 +463,5 @@ public partial class InspectorPanel : PanelContainer
         return (null, entry.DisplayName); // a .material-based entry (e.g. a proto) — name only
     }
 
-    private static string Short(string id)
-        => string.IsNullOrEmpty(id) ? "?" : id.Length <= 6 ? id : id[^6..];
+    private static string Short(string id) => UiFactory.ShortId(id);
 }

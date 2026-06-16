@@ -1,6 +1,6 @@
 # LevelBuilder
 
-> ⚠️ **This project was vibe slopped 100%.**
+> ⚠️ **This project was 100% vibe slopped.**
 
 A standalone **Godot 4.6 / C#** application for designing game levels out of parametric
 primitives — floors, walls, ramps, stairs, curves, domes, doors and windows — on a snapping
