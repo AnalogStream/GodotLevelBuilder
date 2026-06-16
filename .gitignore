@@ -1,3 +1,6 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Per-install app settings (AppConfig writes here when run from the editor)
+/Settings/

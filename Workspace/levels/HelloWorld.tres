@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="LevelDocument" format=3]
+
+[ext_resource type="Script" path="res://Source/Core/Data/GridSettings.cs" id="1_nx8j1"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialEntry.cs" id="2_hcpq8"]
+[ext_resource type="Script" path="res://Source/Core/Data/MaterialLibrary.cs" id="3_2vcku"]
+[ext_resource type="Script" path="res://Source/Core/Data/StoreyData.cs" id="4_ukaeo"]
+[ext_resource type="Script" path="res://Source/Core/Data/PrimitiveInstanceData.cs" id="5_y64t8"]
+[ext_resource type="Script" path="res://Source/Core/Data/LevelDocument.cs" id="6_sb37i"]
+
+[sub_resource type="Resource" id="Resource_klbqa"]
+script = ExtResource("1_nx8j1")
+
+[sub_resource type="Resource" id="Resource_igrkq"]
+script = ExtResource("2_hcpq8")
+Id = "proto_floor"
+DisplayName = "Proto Floor"
+MaterialPath = "res://Assets/Materials/proto_floor.tres"
+
+[sub_resource type="Resource" id="Resource_02hb8"]
+script = ExtResource("2_hcpq8")
+Id = "proto_wall"
+DisplayName = "Proto Wall"
+MaterialPath = "res://Assets/Materials/proto_wall.tres"
+
+[sub_resource type="Resource" id="Resource_dyhmk"]
+script = ExtResource("2_hcpq8")
+Id = "proto_trim"
+DisplayName = "Proto Trim"
+MaterialPath = "res://Assets/Materials/proto_trim.tres"
+
+[sub_resource type="Resource" id="Resource_fhuys"]
+script = ExtResource("3_2vcku")
+Entries = Array[ExtResource("2_hcpq8")]([SubResource("Resource_igrkq"), SubResource("Resource_02hb8"), SubResource("Resource_dyhmk")])
+
+[sub_resource type="Resource" id="Resource_rvsld"]
+script = ExtResource("4_ukaeo")
+Id = "40825c03"
+Name = "Ground Floor"
+
+[resource]
+script = ExtResource("6_sb37i")
+Name = "HelloWorld"
+Grid = SubResource("Resource_klbqa")
+Materials = SubResource("Resource_fhuys")
+Storeys = Array[ExtResource("4_ukaeo")]([SubResource("Resource_rvsld")])
