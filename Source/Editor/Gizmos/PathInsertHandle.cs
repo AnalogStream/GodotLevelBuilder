@@ -32,8 +32,11 @@ public sealed class PathInsertHandle : IEditHandle, IStyledHandle
         _cell = cell;
         _orig = PathPoints.Read(inst);
         _origBanks = PathPoints.ReadBanks(inst, _orig.Count);
-        _midLocal = (_orig[segIndex] + _orig[segIndex + 1]) * 0.5f;
-        _midBank = (_origBanks[segIndex] + _origBanks[segIndex + 1]) * 0.5f;
+        // Next index wraps so the CLOSING segment (last→first, segIndex = count-1) works: its midpoint is
+        // between the last and first points, and Insert(count, …) appends the new point at the seam.
+        int next = (segIndex + 1) % _orig.Count;
+        _midLocal = (_orig[segIndex] + _orig[next]) * 0.5f;
+        _midBank = (_origBanks[segIndex] + _origBanks[next]) * 0.5f;
     }
 
     public Color WidgetColor => new(1.0f, 0.85f, 0.2f);

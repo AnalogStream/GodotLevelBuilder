@@ -30,6 +30,8 @@ public static class InstanceHandleProvider
                 // described by its points (identity basis), so anchors are just worldOffset + localPoint.
                 Vector3 off = inst.LocalTransform.Origin + elevationOffset;
                 Godot.Collections.Array<Godot.Vector3> pts = PathPoints.Read(inst);
+                bool pathClosed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool()
+                                  && pts.Count >= 3;
                 for (int i = 0; i < pts.Count; i++)
                 {
                     handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: false));
@@ -37,7 +39,9 @@ public static class InstanceHandleProvider
                     handles.Add(new PathBankHandle(inst, i, off + pts[i], PathLateral(pts, i)));
                     if (pts.Count > 2) handles.Add(new PathRemoveHandle(inst, i, off));
                 }
-                for (int i = 0; i < pts.Count - 1; i++)
+                // One insert per segment; a closed path also gets one on the wrap-around closing segment.
+                int segCount = pathClosed ? pts.Count : pts.Count - 1;
+                for (int i = 0; i < segCount; i++)
                     handles.Add(new PathInsertHandle(inst, i, off, grid.CellSize));
                 break;
             }

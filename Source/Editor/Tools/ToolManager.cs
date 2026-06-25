@@ -94,7 +94,7 @@ public partial class ToolManager : Node
             if (_idByTool.TryGetValue(tool, out string id))
                 _hotkeyById[id] = key.ToString();
 
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points, click last point again to finish), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points; click last point again to finish, or first point to close a loop), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Cancels any in-progress tool operation (e.g. a half-drawn primitive) before a

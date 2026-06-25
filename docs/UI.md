@@ -218,6 +218,18 @@ Two safeguards make this robust now that Controls border the viewport:
   select-click could jump the object. A press must travel >6px (screen space, via
   `InstancePicker.MouseScreen()`) before any handle moves.
 
+### Path-sweep point handles
+Most primitives expose axis-resize handles for scalar dimensions. A selected `path_sweep` instead shows
+**per-control-point handles** (`Editor/Gizmos/Path*Handle`, all the same `IEditHandle` SelectTool drives):
+move-in-plan (blue, X/Z), move-in-height (green, vertical), bank (orange, vertical drag → roll), and
+remove (red, click); plus a per-segment insert (yellow, drag to add a point — including the closing
+segment of a loop). Colours/sizes come from the optional `IStyledHandle` (default blue at full size).
+Two specifics worth knowing: the **remove** handle commits on a plain *click* (`Changed => true`, since
+the deadzone gates `Preview` but not `Commit`) and is offset to the side so it can't collapse onto the
+move handles in top-down view (where a mis-click would silently delete); the point edits all snapshot
+both `points` and `banks` into one `EditPathCommand` (see `DATA_MODEL.md`). `profile` and `closed` are
+plain inspector params (`profile` renders as a dropdown — `ParamSpec.Options` → `OptionButton`).
+
 ## Conventions for new panels
 
 - Build in code in `Main._Ready`; give each panel a `Setup(...)` called after it's in the tree

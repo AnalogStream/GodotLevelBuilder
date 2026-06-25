@@ -107,9 +107,45 @@ wall, placed via `OpeningTool` (see below).
 | `banked_curve` | Curves | `C` | radius, arc, width, bank, rise, thickness, segments | Surface, Side |
 | `half_pipe` | Curves | `U` | length, radius, arc, curve, rise, deck, deckWidth, thickness, sides, segments | Surface, Side |
 | `dome` | Curves | `O` | radius, height, convex, rings, sides | Surface, Bottom, Side |
+| `path_sweep` | Curves | `P` | profile, width, thickness, bank, wallHeight, radius, arc, sides, segments, closed (+ a freeform control-point list) | Surface, Side |
 
 This list is not a closed set — the registry is the extension point; adding a class + one
 registration line adds a primitive (no data-model/serializer/baker changes).
+
+## Path sweep — a cross-section swept along a freeform curve (load-bearing)
+
+`path_sweep` is the unified "path tool": curved walls, banked roads, and half-pipe channels along an
+**arbitrary 3D spline** rather than the fixed circular arc the other curve primitives use. It's the one
+primitive whose geometry is driven by **variable-length data**, not just scalars.
+
+- **Path data.** The control points live in `Parameters["points"]` as a `Godot.Collections.Array<Vector3>`
+  (local space, relative to the instance origin), with a parallel `Parameters["banks"]`
+  (`Array<float>`, degrees) holding a per-point bank. Both are variable-length and **must stay
+  index-aligned** — every edit (move/insert/remove) touches them together. See `DATA_MODEL.md` for why
+  this round-trips and how it's read back safely. The instance basis is identity; the path fully
+  describes the shape.
+- **Curve + frame.** The points are smoothed into a `Curve3D` (Catmull-Rom handles) and sampled into
+  stations. Each station gets a **rotation-minimizing frame** (parallel-transport an up vector from the
+  start), so the cross-section keeps its orientation through steep climbs and loops where a fixed
+  world-up or a Frenet frame would twist or degenerate. `bank` (global) plus the per-point bank
+  (interpolated by arc offset) roll the frame about the tangent.
+- **Profiles.** `profile` picks the cross-section, each a closed 2D loop in frame coords (X = lateral,
+  Y = up) swept as quad strips: `0` **Ribbon** (flat slab — bank it for a banked road), `1` **Channel**
+  (concave U / half-pipe — `radius`/`arc`/`sides`), `2` **Wall** (upright guard wall — `wallHeight`).
+  Loops follow the same exterior-on-left winding as `HalfPipePrimitive`'s sweep; end caps triangulate
+  the loop and orient each triangle by its own geometric normal (TriangulatePolygon's winding isn't
+  guaranteed), so caps can't silently invert.
+- **Closed loops.** `closed` (≥3 points) wraps the curve cyclically and the sweep seam-to-seam with no
+  end caps. A parallel-transported frame doesn't return to its start orientation around a loop (a
+  residual *holonomy* twist); the builder measures that residual about the closing tangent and unwinds
+  it linearly along the ring so the seam joins untwisted. (Sanity: a flat horizontal ring has zero
+  holonomy.)
+- **Editing.** Unlike the axis-resize gizmos of other primitives, a selected path shows **per-point
+  handles** — move in plan / move in height / bank / remove — plus a per-segment insert handle. See
+  `UI.md`. `profile` and `closed` are edited from the inspector (`profile` as a labelled dropdown via
+  `ParamSpec.Options`).
+- **Collision** is the trimesh of the swept mesh — concavity preserved, so a ball rolls *inside*
+  channels and loops.
 
 ## Adding a custom primitive
 

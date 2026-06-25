@@ -10,8 +10,9 @@ namespace LevelBuilder.Editor.Tools;
 /// <summary>
 /// Draws a path-swept primitive: each click drops a control point on the grid; the path is rubber-banded
 /// through them and a cross-section is swept along the smoothed curve. Finish by clicking the last point
-/// again (a double-click on the same corner); Esc / right-click cancels the whole path. The cross-section
-/// profile and its dimensions take defaults and are tuned afterwards in the inspector.
+/// again (open path), or click the FIRST point (≥3 placed) to finish as a CLOSED loop; Esc / right-click
+/// cancels the whole path. The cross-section profile and its dimensions take defaults and are tuned
+/// afterwards in the inspector (including a "Closed Loop" toggle to switch an existing path either way).
 ///
 /// Slice 1 lays the path on the storey floor plane (X/Z only) — per-point height and bank, which steep /
 /// looping tracks need, come from the point-edit gizmo (a later slice), not the floor click.
@@ -31,11 +32,14 @@ public sealed class PathSweepDrawTool : DrawToolBase
         if (corner == null) return;
         var p = new Vector3(corner.Value.X, 0, corner.Value.Z);
 
+        // Click the FIRST point again (≥3 placed) to finish as a CLOSED loop.
+        if (_points.Count >= 3 && p.DistanceTo(_points[0]) < 0.001f) { Commit(closed: true); return; }
+
         bool atLast = _points.Count > 0 && p.DistanceTo(_points[^1]) < 0.001f;
         if (atLast)
         {
-            if (_points.Count >= 2) Commit(); // click the last point again to finish
-            return;                            // otherwise ignore (zero-length segment)
+            if (_points.Count >= 2) Commit(closed: false); // click the last point again to finish (open)
+            return;                                         // otherwise ignore (zero-length segment)
         }
         _points.Add(p);
     }
@@ -45,27 +49,29 @@ public sealed class PathSweepDrawTool : DrawToolBase
         if (_points.Count == 0) { HidePreview(); return; }
 
         var pts = new List<Vector3>(_points);
+        bool closing = false;
         if (Ctx.Cursor.HoveredCorner is Vector3 hov)
         {
             var h = new Vector3(hov.X, 0, hov.Z);
-            if (h.DistanceTo(pts[^1]) > 0.001f) pts.Add(h);
+            if (_points.Count >= 3 && h.DistanceTo(_points[0]) < 0.001f) closing = true; // hovering the first point
+            else if (h.DistanceTo(pts[^1]) > 0.001f) pts.Add(h);
         }
         if (pts.Count < 2) { HidePreview(); return; }
 
-        PrimitiveInstanceData inst = Build(pts);
+        PrimitiveInstanceData inst = Build(pts, closing);
         Transform3D world = inst.LocalTransform;
         world.Origin += Ctx.ElevationOffset;
         ShowPreview(Ctx.Registry.Get("path_sweep").BuildMesh(inst, Ctx.BuildCtx()), world);
     }
 
-    private void Commit()
+    private void Commit(bool closed)
     {
-        if (_points.Count >= 2) Ctx.AddInstance(Build(_points));
+        if (_points.Count >= 2) Ctx.AddInstance(Build(_points, closed));
         ResetState();
         HidePreview();
     }
 
-    private PrimitiveInstanceData Build(List<Vector3> pts)
+    private PrimitiveInstanceData Build(List<Vector3> pts, bool closed)
     {
         var origin = new Vector3(pts[0].X, 0, pts[0].Z);
         var local = new Array<Vector3>();
@@ -88,6 +94,7 @@ public sealed class PathSweepDrawTool : DrawToolBase
                 { "arc", 180.0 },
                 { "sides", 12 },
                 { "segments", 8 },
+                { "closed", closed },
             },
         };
     }

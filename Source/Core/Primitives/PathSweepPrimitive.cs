@@ -46,6 +46,7 @@ public sealed class PathSweepPrimitive : IPrimitive
         new ParamSpec("arc",        "Arc (deg)",   ParamType.Float, 180f,  30f,  270f),
         new ParamSpec("sides",      "Sides",       ParamType.Int,   12,    2f,   64f),
         new ParamSpec("segments",   "Segments",    ParamType.Int,   8,     1f,   64f),
+        new ParamSpec("closed",     "Closed Loop", ParamType.Bool,  false),
     };
 
     public IReadOnlyList<string> MaterialSlots { get; } = new[] { "Surface", "Side" };
@@ -65,26 +66,30 @@ public sealed class PathSweepPrimitive : IPrimitive
         float arc = Mathf.DegToRad(GetF(data, "arc", 180f));
         int sides = Mathf.Max(2, GetI(data, "sides", 12));
         int segPer = Mathf.Max(1, GetI(data, "segments", 8));
+        bool closed = GetB(data, "closed", false) && pts.Count >= 3; // a closed ring needs ≥3 points
 
-        // --- Path: smooth the control points into a Curve3D, sample evenly by baked length. ---
-        Curve3D curve = BuildCurve(pts);
+        // --- Path: smooth the control points into a Curve3D (cyclic when closed), sample by baked length. ---
+        Curve3D curve = BuildCurve(pts, closed);
         float len = curve.GetBakedLength();
         if (len < 1e-4f) return empty;
 
-        int stations = Mathf.Max(2, segPer * (pts.Count - 1));
+        // Closed: `stations` segments wrap (station[stations] coincides with station[0]); open: one fewer.
+        int stations = Mathf.Max(2, segPer * (closed ? pts.Count : pts.Count - 1));
         var pos = new Vector3[stations + 1];
         var dist = new float[stations + 1];
         for (int i = 0; i <= stations; i++)
         {
             dist[i] = len * i / stations;
-            pos[i] = curve.SampleBaked(dist[i], true);
+            pos[i] = curve.SampleBaked(dist[i], true); // closed: pos[stations] == pos[0] (curve end == start)
         }
 
-        // --- Per-station tangent (central difference) + rotation-minimizing (right, up) frame. ---
+        // --- Per-station tangent (central difference; cyclic when closed) + rotation-minimizing frame. ---
         var T = new Vector3[stations + 1];
         for (int i = 0; i <= stations; i++)
         {
-            Vector3 d = pos[Mathf.Min(stations, i + 1)] - pos[Mathf.Max(0, i - 1)];
+            Vector3 a = closed ? pos[(i - 1 + stations) % stations] : pos[Mathf.Max(0, i - 1)];
+            Vector3 b = closed ? pos[(i + 1) % stations]            : pos[Mathf.Min(stations, i + 1)];
+            Vector3 d = b - a;
             T[i] = d.LengthSquared() > 1e-9f ? d.Normalized() : (i > 0 ? T[i - 1] : Vector3.Right);
         }
 
@@ -103,16 +108,29 @@ public sealed class PathSweepPrimitive : IPrimitive
             R[i] = T[i].Cross(U[i]).Normalized();
         }
 
-        // Bank: roll the frame about the tangent (preserves orthonormality) by the global bank plus the
-        // per-point bank interpolated by arc length. Control-point arc offsets come from the baked curve
-        // (GetClosestOffset), pinned at the ends, so each station blends its bracketing points' banks.
-        var cpOff = new float[pts.Count];
-        for (int k = 0; k < pts.Count; k++) cpOff[k] = curve.GetClosestOffset(pts[k]);
+        // Closed-loop holonomy: parallel transport doesn't return the up to its start (a residual twist),
+        // so measure the signed residual about the closing tangent (T[stations] == T[0]) and unwind it
+        // linearly along the ring so the seam joins untwisted. Zero for an open path — and, correctly, for
+        // a flat horizontal ring (transporting +Y about a vertical axis is the identity).
+        float holonomy = closed
+            ? Mathf.Atan2(U[stations].Cross(U[0]).Dot(T[0]), U[stations].Dot(U[0]))
+            : 0f;
+
+        // Bank: roll the frame about the tangent by global bank + per-point bank (interpolated by arc
+        // offset) + the distributed holonomy unwind. Control-point offsets come from the baked curve; for a
+        // closed ring the list wraps (offset len ↦ the first point's bank) so the bank stays seam-continuous.
+        int nc = pts.Count;
+        var cpOff = new float[closed ? nc + 1 : nc];
+        for (int k = 0; k < nc; k++) cpOff[k] = curve.GetClosestOffset(pts[k]);
         cpOff[0] = 0f;
-        cpOff[pts.Count - 1] = len;
+        List<float> bankList = banks;
+        if (closed) { cpOff[nc] = len; bankList = new List<float>(banks) { banks[0] }; }
+        else cpOff[nc - 1] = len;
+
         for (int i = 0; i <= stations; i++)
         {
-            float bankDeg = globalBank + BankAt(dist[i], cpOff, banks);
+            float bankDeg = globalBank + BankAt(dist[i], cpOff, bankList)
+                          + Mathf.RadToDeg(holonomy) * ((float)i / stations);
             if (Mathf.Abs(bankDeg) < 1e-4f) continue;
             float a = Mathf.DegToRad(bankDeg);
             R[i] = R[i].Rotated(T[i], a);
@@ -128,7 +146,7 @@ public sealed class PathSweepPrimitive : IPrimitive
         };
 
         SurfaceTool surface = Begin(), side = Begin();
-        Sweep(surface, side, pos, R, U, T, dist, loop, slot);
+        Sweep(surface, side, pos, R, U, T, dist, loop, slot, closed);
 
         var mesh = new ArrayMesh();
         Commit(surface, mesh);
@@ -186,7 +204,7 @@ public sealed class PathSweepPrimitive : IPrimitive
     // --- Sweep the closed loop along the stations: one quad strip per edge + triangulated end caps. ---
 
     private static void Sweep(SurfaceTool surface, SurfaceTool side, Vector3[] pos, Vector3[] R, Vector3[] U,
-        Vector3[] T, float[] dist, Vector2[] loop, int[] slot)
+        Vector3[] T, float[] dist, Vector2[] loop, int[] slot, bool closed)
     {
         int stations = pos.Length - 1;
         int n = loop.Length;
@@ -215,8 +233,13 @@ public sealed class PathSweepPrimitive : IPrimitive
             }
         }
 
-        AddCap(side, loop, 0, pos, R, U, -T[0]);
-        AddCap(side, loop, stations, pos, R, U, T[stations]);
+        // A closed ring has no ends — the final quad (station stations-1 → stations, where pos[stations]
+        // and the holonomy-corrected frame both equal station 0's) seals it. Open paths get end caps.
+        if (!closed)
+        {
+            AddCap(side, loop, 0, pos, R, U, -T[0]);
+            AddCap(side, loop, stations, pos, R, U, T[stations]);
+        }
     }
 
     /// <summary>
@@ -244,19 +267,23 @@ public sealed class PathSweepPrimitive : IPrimitive
 
     // --- Path smoothing: Catmull-Rom-style Bezier handles on a Curve3D. ---
 
-    private static Curve3D BuildCurve(List<Vector3> pts)
+    private static Curve3D BuildCurve(List<Vector3> pts, bool closed)
     {
         var curve = new Curve3D { BakeInterval = 0.05f };
         int n = pts.Count;
-        for (int i = 0; i < n; i++)
+        // Closed: emit n+1 points (the last repeats point 0) with cyclic tangents, so the ring closes
+        // smoothly through point 0 with a matching tangent on both sides of the seam.
+        int count = closed ? n + 1 : n;
+        for (int i = 0; i < count; i++)
         {
-            Vector3 prev = pts[Mathf.Max(0, i - 1)];
-            Vector3 next = pts[Mathf.Min(n - 1, i + 1)];
+            int idx = i % n;
+            Vector3 prev = closed ? pts[(idx - 1 + n) % n] : pts[Mathf.Max(0, idx - 1)];
+            Vector3 next = closed ? pts[(idx + 1) % n]     : pts[Mathf.Min(n - 1, idx + 1)];
             Vector3 dir = next - prev;
             dir = dir.LengthSquared() > 1e-9f ? dir.Normalized() : Vector3.Right;
-            float inLen = (i > 0 ? pts[i].DistanceTo(pts[i - 1]) : 0f) / 3f;
-            float outLen = (i < n - 1 ? pts[i].DistanceTo(pts[i + 1]) : 0f) / 3f;
-            curve.AddPoint(pts[i], -dir * inLen, dir * outLen);
+            float inLen = pts[idx].DistanceTo(prev) / 3f;
+            float outLen = pts[idx].DistanceTo(next) / 3f;
+            curve.AddPoint(pts[idx], -dir * inLen, dir * outLen);
         }
         return curve;
     }
@@ -318,4 +345,7 @@ public sealed class PathSweepPrimitive : IPrimitive
 
     private static int GetI(PrimitiveInstanceData d, string key, int def)
         => d.Parameters.ContainsKey(key) ? d.Parameters[key].AsInt32() : def;
+
+    private static bool GetB(PrimitiveInstanceData d, string key, bool def)
+        => d.Parameters.ContainsKey(key) ? d.Parameters[key].AsBool() : def;
 }
