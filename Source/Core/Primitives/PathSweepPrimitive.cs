@@ -36,7 +36,8 @@ public sealed class PathSweepPrimitive : IPrimitive
 
     public IReadOnlyList<ParamSpec> Parameters { get; } = new[]
     {
-        new ParamSpec("profile",    "Profile (0=Ribbon 1=Channel 2=Wall)", ParamType.Int, 0, 0f, 2f),
+        new ParamSpec("profile", "Profile", ParamType.Int, 0, 0f, 2f,
+            new[] { "Ribbon", "Channel", "Wall" }),
         new ParamSpec("width",      "Width",       ParamType.Float, 4.0f,  0.1f, 1000f),
         new ParamSpec("thickness",  "Thickness",   ParamType.Float, 0.2f,  0.05f, 10f),
         new ParamSpec("bank",       "Bank (deg)",  ParamType.Float, 0.0f, -89f,  89f),

@@ -16,9 +16,12 @@ public sealed class ParamSpec
     public Variant Default { get; }
     public float Min { get; }
     public float Max { get; }
+    /// <summary>For an Int param: labels for each value 0..N-1, shown as a dropdown instead of a spinner.</summary>
+    public string[] Options { get; }
 
     public ParamSpec(string key, string label, ParamType type, Variant def,
-                     float min = float.NegativeInfinity, float max = float.PositiveInfinity)
+                     float min = float.NegativeInfinity, float max = float.PositiveInfinity,
+                     string[] options = null)
     {
         Key = key;
         Label = label;
@@ -26,5 +29,6 @@ public sealed class ParamSpec
         Default = def;
         Min = min;
         Max = max;
+        Options = options;
     }
 }

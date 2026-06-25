@@ -235,6 +235,19 @@ public partial class InspectorPanel : PanelContainer
         }
 
         bool isInt = spec.Type == ParamType.Int;
+
+        if (isInt && spec.Options != null)
+        {
+            var ob = new OptionButton { FocusMode = FocusModeEnum.None }; // don't swallow tool hotkeys
+            for (int i = 0; i < spec.Options.Length; i++) ob.AddItem(spec.Options[i], i);
+            AddRow(spec.Label, ob);
+
+            ParamSpec eo = spec; // capture per-iteration
+            ob.ItemSelected += idx => OnInstanceParam(eo, idx);
+            _syncers.Add(() => ob.Selected = Mathf.RoundToInt(ReadInstanceValue(eo)));
+            return;
+        }
+
         SpinBox sb = BuildSpin(spec.Min, spec.Max, isInt);
         AddRow(spec.Label, sb);
 
