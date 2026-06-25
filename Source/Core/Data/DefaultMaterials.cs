@@ -43,6 +43,7 @@ public static class DefaultMaterials
             ["Front"] = Wall, ["Back"] = Wall, ["Top"] = Trim, ["Ends"] = Trim,
         },
         "dome" => new Dictionary<string, string> { ["Surface"] = Floor, ["Bottom"] = Trim, ["Side"] = Wall },
+        "path_sweep" => new Dictionary<string, string> { ["Surface"] = Floor, ["Side"] = Trim },
         _ => new Dictionary<string, string>(),
     };
 

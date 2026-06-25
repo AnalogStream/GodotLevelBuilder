@@ -31,6 +31,7 @@ public sealed class PrimitiveRegistry
         registry.Register(new CylinderPrimitive());
         registry.Register(new CurvedWallPrimitive());
         registry.Register(new DomePrimitive());
+        registry.Register(new PathSweepPrimitive());
         return registry;
     }
 }

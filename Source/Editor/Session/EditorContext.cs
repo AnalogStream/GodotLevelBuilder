@@ -125,7 +125,7 @@ public sealed class EditorContext
         if (_selectedIds.Count != 1) return new List<IEditHandle>();
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
-        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId));
+        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId), Document.Grid);
     }
 
     /// <summary>World offset of the draw plane, where new geometry is drawn.</summary>

@@ -27,12 +27,14 @@ public partial class GizmoLayer : Node3D
         for (int i = 0; i < handles.Count; i++)
         {
             var xform = new Transform3D(Basis.Identity, handles[i].Anchor);
+            var styled = handles[i] as IStyledHandle;
+            float scale = styled?.WidgetScale ?? 1f;
 
             AddChild(new MeshInstance3D
             {
-                Mesh = MeshBuilder.Box(Vector3.One * WidgetSize),
+                Mesh = MeshBuilder.Box(Vector3.One * WidgetSize * scale),
                 Transform = xform,
-                MaterialOverride = WidgetMaterial(),
+                MaterialOverride = WidgetMaterial(styled?.WidgetColor),
             });
 
             var body = new StaticBody3D
@@ -47,10 +49,10 @@ public partial class GizmoLayer : Node3D
         }
     }
 
-    private static StandardMaterial3D WidgetMaterial() => new()
+    private static StandardMaterial3D WidgetMaterial(Color? color) => new()
     {
         ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        AlbedoColor = new Color(0.3f, 0.85f, 1.0f),
+        AlbedoColor = color ?? new Color(0.3f, 0.85f, 1.0f),
         // Draw on top: opening edge handles sit between the placeholder and the intact wall, and the
         // far-side instance handles sit behind the body — both opaque, so without this they're buried.
         NoDepthTest = true,

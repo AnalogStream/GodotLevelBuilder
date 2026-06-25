@@ -12,7 +12,8 @@ namespace LevelBuilder.Editor.Gizmos;
 /// </summary>
 public static class InstanceHandleProvider
 {
-    public static List<IEditHandle> Build(PrimitiveInstanceData inst, IPrimitive prim, Vector3 elevationOffset)
+    public static List<IEditHandle> Build(PrimitiveInstanceData inst, IPrimitive prim, Vector3 elevationOffset,
+        GridSettings grid)
     {
         var handles = new List<IEditHandle>();
         if (prim == null) return handles;
@@ -22,6 +23,23 @@ public static class InstanceHandleProvider
 
         switch (prim.TypeId)
         {
+            case "path_sweep":
+            {
+                // Per control point: an X/Z planar mover + a vertical (height) mover, plus a remove widget
+                // (only while >2 points remain). Per segment: a midpoint insert widget. The path is fully
+                // described by its points (identity basis), so anchors are just worldOffset + localPoint.
+                Vector3 off = inst.LocalTransform.Origin + elevationOffset;
+                Godot.Collections.Array<Godot.Vector3> pts = PathPoints.Read(inst);
+                for (int i = 0; i < pts.Count; i++)
+                {
+                    handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: false));
+                    handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: true));
+                    if (pts.Count > 2) handles.Add(new PathRemoveHandle(inst, i, off));
+                }
+                for (int i = 0; i < pts.Count - 1; i++)
+                    handles.Add(new PathInsertHandle(inst, i, off, grid.CellSize));
+                break;
+            }
             case "floor":
             {
                 float w = GetF(inst, "width", 4f), d = GetF(inst, "depth", 4f), t = GetF(inst, "thickness", 0.2f);
