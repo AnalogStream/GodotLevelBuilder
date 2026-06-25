@@ -1,16 +1,14 @@
 # LevelBuilder
 
-> ⚠️ **This project was 100% vibe slopped.**
-
-<img width="2560" height="1369" alt="Godot_v4 6 3-stable_mono_win64_q2hpHT46Dt" src="https://github.com/user-attachments/assets/094a7cd3-81d6-49fd-8052-2ed55c524244" />
-
-
-A standalone **Godot 4.6 / C#** application for designing game levels out of parametric
+A standalone **Godot 4.7 / C#** application for designing game levels out of parametric
 primitives — floors, walls, ramps, stairs, curves, domes, doors and windows — on a snapping
 3D grid, then **baking** them into a `.tscn` you drop straight into another Godot game.
 
 Geometry is **procedural `ArrayMesh`** (no live CSG). Each primitive type generates its own
 mesh, collision, and named material slots, and is registered in a `PrimitiveRegistry`.
+
+<img width="2560" height="1369" alt="Godot_v4 6 3-stable_mono_win64_q2hpHT46Dt" src="https://github.com/user-attachments/assets/094a7cd3-81d6-49fd-8052-2ed55c524244" />
+
 
 ## What you get
 
@@ -200,29 +198,8 @@ Source/
   UI/             InspectorPanel, SceneTreePanel, PrimitivePalettePanel, TexturePalettePanel, ProjectPanel
 Scenes/           Main.tscn (a bare Node3D + the Main script)
 Assets/           sample Materials/, Icons/, bundled + user textures
-docs/             design docs (see below)
 ```
 
 C# namespaces mirror the folders under `LevelBuilder.*` (e.g. `LevelBuilder.Core.Primitives`).
 Serialized data classes are `[GlobalClass] partial class Foo : Resource` with `[Export]`
 properties — **one class per file**, filename matching the class, or `.tres` loads fail silently.
-
-## Documentation
-
-| Doc | Covers |
-|-----|--------|
-| `CLAUDE.md` | How to build, run, and not break things (the operational guide). |
-| `docs/ARCHITECTURE.md` | System overview, modules, data flow. |
-| `docs/DATA_MODEL.md` | The `Resource` graph, serialization rules & C# gotchas. |
-| `docs/PRIMITIVES.md` | The primitive contract, wall openings, frame binding, hard cases. |
-| `docs/EXPORT.md` | Save/load + bake pipeline, material & node-naming rules. |
-| `docs/UI.md` | Editor shell layout, panels, the SubViewport, drag-drop gotchas. |
-| `docs/ROADMAP.md` | Milestones and current status. |
-| `docs/CONVENTIONS.md` | C#/Godot coding conventions. |
-
-## Status
-
-Milestones M1–M4 are done and F5-verified; primitive breadth and the texturing workflow are
-largely in place. Known gaps include per-slot / set-for-type material assignment, a fully
-`ParamSpec`-driven inspector, and arbitrary (non-rectangular) floor polygons. See
-`docs/ROADMAP.md` for the live picture.
