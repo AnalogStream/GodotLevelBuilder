@@ -34,6 +34,7 @@ public static class InstanceHandleProvider
                 {
                     handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: false));
                     handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: true));
+                    handles.Add(new PathBankHandle(inst, i, off + pts[i], PathLateral(pts, i)));
                     if (pts.Count > 2) handles.Add(new PathRemoveHandle(inst, i, off));
                 }
                 for (int i = 0; i < pts.Count - 1; i++)
@@ -240,6 +241,16 @@ public static class InstanceHandleProvider
         var arr = new OpeningData[openings.Count];
         for (int i = 0; i < openings.Count; i++) arr[i] = openings[i];
         return arr;
+    }
+
+    /// <summary>A horizontal unit vector perpendicular to the path's local direction at point <paramref name="i"/>
+    /// (from its neighbours) — where the bank handle's arm sticks out. Falls back to +Z when degenerate.</summary>
+    private static Vector3 PathLateral(Godot.Collections.Array<Vector3> pts, int i)
+    {
+        Vector3 prev = pts[Mathf.Max(0, i - 1)], next = pts[Mathf.Min(pts.Count - 1, i + 1)];
+        Vector3 tangent = next - prev;
+        Vector3 lateral = tangent.Cross(Vector3.Up);
+        return lateral.LengthSquared() > 1e-6f ? lateral.Normalized() : new Vector3(0, 0, 1);
     }
 
     private static (float, float) Range(IPrimitive prim, string key)
