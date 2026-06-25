@@ -30,7 +30,13 @@ public static class TextureCatalog
     {
         var items = new List<TextureItem>();
         LoadPack(items);
+        int packCount = items.Count;
         LoadUser(items);
+
+        // Empty bundled pack = the res:// enumeration found nothing (e.g. an export that didn't ship
+        // the textures, or a path/suffix the strip didn't catch). Surface it instead of a silent blank palette.
+        if (packCount == 0)
+            GD.PushWarning($"[texture] bundled pack at {Root} enumerated 0 textures — check the export included it.");
         return items;
     }
 
@@ -43,10 +49,26 @@ public static class TextureCatalog
         {
             using DirAccess colorDir = DirAccess.Open($"{Root}/{sub}");
             if (colorDir == null) continue;
-            foreach (string file in colorDir.GetFiles())
+            foreach (string raw in colorDir.GetFiles())
+            {
+                // In an EXPORTED build the source .png isn't in the PCK — only the imported texture,
+                // which DirAccess lists with a ".remap" (or ".import") suffix appended. Strip it to
+                // recover the original res:// path; ResourceLoader resolves that via the remap. In the
+                // editor the raw .png is listed as-is, so the strip is a no-op there.
+                string file = StripExportSuffix(raw);
                 if (IsImage(file))
                     items.Add(new TextureItem($"{Root}/{sub}/{file}", sub, file));
+            }
         }
+    }
+
+    /// <summary>Removes a trailing <c>.remap</c> or <c>.import</c> that exported-build directory
+    /// listings append to imported resources, recovering the original source path.</summary>
+    private static string StripExportSuffix(string file)
+    {
+        if (file.EndsWith(".remap")) return file[..^".remap".Length];
+        if (file.EndsWith(".import")) return file[..^".import".Length];
+        return file;
     }
 
     private static void LoadUser(List<TextureItem> items)
