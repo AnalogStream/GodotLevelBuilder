@@ -19,6 +19,8 @@ namespace LevelBuilder.Core.Primitives;
 ///   0 Ribbon  — a flat slab you roll on (top = Surface, sides/bottom = Side); bank it for a banked road.
 ///   1 Channel — a U-shell half-pipe (concave inside = Surface, outer shell + rims = Side).
 ///   2 Wall    — a thin upright wall / guard rail (vertical faces = Surface, top/bottom = Side).
+///   3 Tube    — a full circular pipe, ball rolls inside (inner bore = Surface, outer shell = Side); for
+///               loops. Two concentric rings (not a single loop), so it has its own sweep (SweepTube).
 ///
 /// Loops are wound so the exterior normal is the edge's LEFT-normal (−dY, dX) — the same convention as
 /// the verified <see cref="HalfPipePrimitive"/> sweep, so the quad-strip winding is inherited. End caps
@@ -32,12 +34,12 @@ public sealed class PathSweepPrimitive : IPrimitive
     public string Category => "Curves";
 
     // Profile enum (the "profile" param).
-    private const int Ribbon = 0, Channel = 1, Wall = 2;
+    private const int Ribbon = 0, Channel = 1, Wall = 2, Tube = 3;
 
     public IReadOnlyList<ParamSpec> Parameters { get; } = new[]
     {
-        new ParamSpec("profile", "Profile", ParamType.Int, 0, 0f, 2f,
-            new[] { "Ribbon", "Channel", "Wall" }),
+        new ParamSpec("profile", "Profile", ParamType.Int, 0, 0f, 3f,
+            new[] { "Ribbon", "Channel", "Wall", "Tube" }),
         new ParamSpec("width",      "Width",       ParamType.Float, 4.0f,  0.1f, 1000f),
         new ParamSpec("thickness",  "Thickness",   ParamType.Float, 0.2f,  0.05f, 10f),
         new ParamSpec("bank",       "Bank (deg)",  ParamType.Float, 0.0f, -89f,  89f),
@@ -137,16 +139,24 @@ public sealed class PathSweepPrimitive : IPrimitive
             U[i] = U[i].Rotated(T[i], a);
         }
 
-        // --- Cross-section loop + per-edge slot for the chosen profile. ---
-        (Vector2[] loop, int[] slot) = profile switch
-        {
-            Channel => ChannelLoop(radius, t, arc, sides),
-            Wall    => WallLoop(t, wallH),
-            _       => RibbonLoop(width, t),
-        };
-
         SurfaceTool surface = Begin(), side = Begin();
-        Sweep(surface, side, pos, R, U, T, dist, loop, slot, closed);
+        if (profile == Tube)
+        {
+            // A full pipe is two concentric rings, not a simple loop (an annulus can't be one
+            // TriangulatePolygon polygon), so it gets its own sweep with annular end caps.
+            SweepTube(surface, side, pos, R, U, T, dist, radius, t, sides, closed);
+        }
+        else
+        {
+            // --- Cross-section loop + per-edge slot for the chosen profile. ---
+            (Vector2[] loop, int[] slot) = profile switch
+            {
+                Channel => ChannelLoop(radius, t, arc, sides),
+                Wall    => WallLoop(t, wallH),
+                _       => RibbonLoop(width, t),
+            };
+            Sweep(surface, side, pos, R, U, T, dist, loop, slot, closed);
+        }
 
         var mesh = new ArrayMesh();
         Commit(surface, mesh);
@@ -240,6 +250,58 @@ public sealed class PathSweepPrimitive : IPrimitive
             AddCap(side, loop, 0, pos, R, U, -T[0]);
             AddCap(side, loop, stations, pos, R, U, T[stations]);
         }
+    }
+
+    /// <summary>
+    /// Sweeps a full circular pipe (the Tube profile): an inner ring (Surface, the bore the ball rolls
+    /// inside, normals facing the axis) and a concentric outer ring (Side, normals out). The circle is
+    /// centred so its lowest point sits on the path (frame (0,0)) — same convention as the channel, so a
+    /// closed channel and a tube line up. Open paths get an annular ring end cap; a closed ring needs none
+    /// (the wrap quad meets the holonomy-matched seam frame). Winding mirrors the verified channel sweep.
+    /// </summary>
+    private static void SweepTube(SurfaceTool surface, SurfaceTool side, Vector3[] pos, Vector3[] R, Vector3[] U,
+        Vector3[] T, float[] dist, float r, float t, int sides, bool closed)
+    {
+        int stations = pos.Length - 1;
+        var inL = new float[sides + 1]; var inU = new float[sides + 1];
+        var outL = new float[sides + 1]; var outU = new float[sides + 1];
+        var radL = new float[sides + 1]; var radU = new float[sides + 1]; // outward radial unit (lateral, up)
+        var vArc = new float[sides + 1];
+        for (int k = 0; k <= sides; k++)
+        {
+            float th = Mathf.Tau * k / sides;
+            float c = Mathf.Cos(th), s = Mathf.Sin(th);
+            inL[k] = r * s;          inU[k] = r - r * c;            // θ=0 → (0,0) bottom, on the path
+            outL[k] = (r + t) * s;   outU[k] = r - (r + t) * c;
+            radL[k] = s;             radU[k] = -c;                  // from the circle centre (0,r) outward
+            vArc[k] = r * th;
+        }
+
+        Vector3 In(int i, int k) => pos[i] + inL[k] * R[i] + inU[k] * U[i];
+        Vector3 Out(int i, int k) => pos[i] + outL[k] * R[i] + outU[k] * U[i];
+        Vector3 Rad(int i, int k) => (radL[k] * R[i] + radU[k] * U[i]).Normalized();
+
+        for (int i = 0; i < stations; i++)
+        {
+            int j = i + 1;
+            for (int k = 0; k < sides; k++)
+            {
+                int m = k + 1;
+                Vector3 nIn = -(Rad(i, k) + Rad(i, m) + Rad(j, m) + Rad(j, k)).Normalized(); // toward the axis
+                MeshBuilder.AddQuad(surface, In(i, k), In(i, m), In(j, m), In(j, k), nIn,
+                    new Vector2(dist[i], vArc[k]), new Vector2(dist[i], vArc[m]),
+                    new Vector2(dist[j], vArc[m]), new Vector2(dist[j], vArc[k]));
+                MeshBuilder.AddQuad(side, Out(i, m), Out(i, k), Out(j, k), Out(j, m), -nIn); // outward shell
+            }
+        }
+
+        if (!closed)
+            for (int k = 0; k < sides; k++)
+            {
+                int m = k + 1;
+                MeshBuilder.AddQuadFacing(side, In(0, k), Out(0, k), Out(0, m), In(0, m), -T[0]);
+                MeshBuilder.AddQuadFacing(side, In(stations, k), Out(stations, k), Out(stations, m), In(stations, m), T[stations]);
+            }
     }
 
     /// <summary>

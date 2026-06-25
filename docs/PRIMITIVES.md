@@ -131,10 +131,13 @@ primitive whose geometry is driven by **variable-length data**, not just scalars
   (interpolated by arc offset) roll the frame about the tangent.
 - **Profiles.** `profile` picks the cross-section, each a closed 2D loop in frame coords (X = lateral,
   Y = up) swept as quad strips: `0` **Ribbon** (flat slab — bank it for a banked road), `1` **Channel**
-  (concave U / half-pipe — `radius`/`arc`/`sides`), `2` **Wall** (upright guard wall — `wallHeight`).
-  Loops follow the same exterior-on-left winding as `HalfPipePrimitive`'s sweep; end caps triangulate
-  the loop and orient each triangle by its own geometric normal (TriangulatePolygon's winding isn't
-  guaranteed), so caps can't silently invert.
+  (concave U / half-pipe — `radius`/`arc`/`sides`), `2` **Wall** (upright guard wall — `wallHeight`),
+  `3` **Tube** (a full circular pipe the ball rolls *inside* — for loops). Ribbon/Channel/Wall follow the
+  same exterior-on-left winding as `HalfPipePrimitive`'s sweep; end caps triangulate the loop and orient
+  each triangle by its own geometric normal (TriangulatePolygon's winding isn't guaranteed), so caps
+  can't silently invert. **Tube is the exception**: a pipe cross-section is an annulus (a hole — not one
+  simple polygon), so it has its own `SweepTube` (two concentric rings + annular end caps), not the loop
+  sweep.
 - **Closed loops.** `closed` (≥3 points) wraps the curve cyclically and the sweep seam-to-seam with no
   end caps. A parallel-transported frame doesn't return to its start orientation around a loop (a
   residual *holonomy* twist); the builder measures that residual about the closing tangent and unwinds
