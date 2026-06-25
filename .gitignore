@@ -4,3 +4,6 @@
 
 # Per-install app settings (AppConfig writes here when run from the editor)
 /Settings/
+
+# Rider / IntelliJ
+.idea/
