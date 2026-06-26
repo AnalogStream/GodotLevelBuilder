@@ -267,18 +267,23 @@ public sealed class EditorContext
         Commands.Execute(new AddInstanceCommand(Document, _drawHeight, Document.DefaultStoreyHeight, instance, Refresh));
     }
 
-    /// <summary>Sets (or clears) the hole ring of a polygon floor (undoable). <paramref name="hole"/> with
-    /// &lt;3 points clears it. No-op if the instance is gone or isn't a polygon floor. Called by the cut-hole tool.</summary>
-    public void SetPolygonHole(string instanceId, Godot.Collections.Array<Vector3> hole)
+    /// <summary>Appends a hole ring (≥3 points) to a polygon floor (undoable). No-op if the instance is gone,
+    /// isn't a polygon floor, or the ring is too small. Called by the cut-hole tool; supports many holes.</summary>
+    public void AddPolygonHole(string instanceId, Godot.Collections.Array<Vector3> ring)
     {
         PrimitiveInstanceData inst = GetInstance(instanceId);
-        if (inst == null || inst.PrimitiveType != "polygon_floor") return;
+        if (inst == null || inst.PrimitiveType != "polygon_floor" || ring.Count < 3) return;
 
-        var from = new Godot.Collections.Array<Vector3>();
-        if (inst.Parameters.ContainsKey("hole"))
-            foreach (Variant v in inst.Parameters["hole"].AsGodotArray()) from.Add(v.AsVector3());
+        List<List<Vector3>> holes = PolygonHoles.Decode(inst);
+        (Godot.Collections.Array<Vector3> fromV, Godot.Collections.Array<float> fromS) = PolygonHoles.Encode(holes);
 
-        Commands.Execute(new SetHoleCommand(inst, from, hole, Refresh));
+        var added = new List<Vector3>();
+        foreach (Vector3 p in ring) added.Add(p);
+        holes.Add(added);
+        (Godot.Collections.Array<Vector3> toV, Godot.Collections.Array<float> toS) = PolygonHoles.Encode(holes);
+
+        Commands.Execute(new SetHolesCommand(inst, fromV, fromS, toV, toS, Refresh));
+        GD.Print($"[cut hole] polygon now has {holes.Count} hole(s) in data (skipped ones won't render)");
     }
 
     /// <summary>

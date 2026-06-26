@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using Godot.Collections;
 using LevelBuilder.Core.Data;
+using LevelBuilder.Core.Primitives;
 using LevelBuilder.Editor.Grid;
 using LevelBuilder.Editor.Session;
 
@@ -10,11 +11,11 @@ namespace LevelBuilder.Editor.Tools;
 /// <summary>
 /// Cuts a hole into the SELECTED polygon floor: each click drops a hole-ring corner inside the slab; the
 /// holed slab is rubber-banded live (the hole appears once the ring is valid). Finish by clicking the
-/// FIRST corner again (≥3 placed) to close the hole; Esc / right-click cancels. Re-cutting replaces the
-/// existing hole. Implements <see cref="IPreservesSelection"/> so activating it keeps the polygon selected
-/// (the target). One hole per floor; a ring drawn outside the outline reads as no hole (see the primitive).
+/// FIRST corner again (≥3 placed) to close the hole; Esc / right-click cancels. Each cut ADDS a hole, so
+/// you can cut several. Implements <see cref="IPreservesSelection"/> so activating it keeps the polygon
+/// selected (the target). A ring drawn outside the outline (or overlapping another hole) reads as no hole.
 ///
-/// Editing a hole's corners with gizmos and removing a hole are a later slice — for now re-cut to adjust.
+/// Editing a hole's corners with gizmos and removing a hole are a later slice — for now re-cut to add more.
 /// </summary>
 public sealed class CutHoleTool : DrawToolBase, IPreservesSelection
 {
@@ -70,8 +71,15 @@ public sealed class CutHoleTool : DrawToolBase, IPreservesSelection
             if (!onFirst && (_points.Count == 0 || h.DistanceTo(_points[^1]) > 0.001f)) ring.Add(h);
         }
 
-        // Throwaway instance (never mutate the live target): the target's outline + the in-progress hole.
-        // A <3-point or invalid hole is ignored by the primitive → the slab previews solid, never blanks.
+        // Throwaway instance (never mutate the live target): the target's outline + ALL its existing holes +
+        // the in-progress one. A <3-point or invalid ring is ignored by the primitive → previews solid, never
+        // blanks; existing holes keep showing while the new one is drawn.
+        List<List<Vector3>> holes = PolygonHoles.Decode(target);
+        var inProgress = new List<Vector3>();
+        foreach (Vector3 p in ring) inProgress.Add(new Vector3(p.X - origin.X, 0, p.Z - origin.Z));
+        holes.Add(inProgress);
+        (Array<Vector3> verts, Array<float> sizes) = PolygonHoles.Encode(holes);
+
         var preview = new PrimitiveInstanceData
         {
             PrimitiveType = "polygon_floor",
@@ -79,7 +87,8 @@ public sealed class CutHoleTool : DrawToolBase, IPreservesSelection
             Parameters = new Dictionary
             {
                 { "points", ReadArray(target, "points") },
-                { "hole", ToLocal(ring, origin) },
+                { PolygonHoles.VertsKey, verts },
+                { PolygonHoles.SizesKey, sizes },
                 { "thickness", target.Parameters.ContainsKey("thickness") ? target.Parameters["thickness"] : 0.2 },
             },
         };
@@ -90,7 +99,7 @@ public sealed class CutHoleTool : DrawToolBase, IPreservesSelection
     {
         PrimitiveInstanceData target = Target();
         if (target != null && _points.Count >= 3)
-            Ctx.SetPolygonHole(Ctx.SelectedId, ToLocal(_points, target.LocalTransform.Origin));
+            Ctx.AddPolygonHole(Ctx.SelectedId, ToLocal(_points, target.LocalTransform.Origin));
         ResetState();
         HidePreview();
     }

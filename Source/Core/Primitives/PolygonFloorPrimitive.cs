@@ -19,14 +19,17 @@ namespace LevelBuilder.Core.Primitives;
 /// to a centroid fan (exact for a convex polygon, and the preview never blanks out). The sides are one
 /// vertical quad per edge, oriented outward from the polygon centroid. Surfaces: 0 = Top, 1 = Bottom, 2 = Edge.
 ///
-/// An optional single hole ring lives in <c>Parameters["hole"]</c> (same local space; ≥3 points). Rather
-/// than triangulate a polygon-with-hole directly (CLAUDE.md gotcha #1), the hole is BRIDGED into the
-/// outline — a zero-width seam stitches the two rings into one simple polygon that
-/// <see cref="Geometry2D.TriangulatePolygon"/> handles — and the hole gets inward-facing side walls, so
-/// the trimesh collision has a real void (the ball falls through). The hole is ALL-OR-NOTHING: if the
-/// bridge/triangulation fails (e.g. a ring drawn partly outside the outline, the common state mid-draw),
-/// the slab renders SOLID (no hole, no hole walls) rather than producing garbage — so a hole drawn
-/// outside the outline silently reads as no hole. Multiple holes are not supported (one ring only).
+/// Holes live in <c>Parameters["holes"]/["holeSizes"]</c> (see <see cref="PolygonHoles"/>). Rather than
+/// triangulate a polygon-with-holes directly (CLAUDE.md gotcha #1), each hole is BRIDGED into the outline
+/// — a zero-width seam stitches the rings into one simple polygon that
+/// <see cref="Geometry2D.TriangulatePolygon"/> handles — and each hole gets inward-facing side walls, so
+/// the trimesh collision has real voids (the ball falls through). Holes are bridged SEQUENTIALLY,
+/// right-to-left (max-X descending); per hole TWO bridge variants are tried (vertex / edge — they pinch on
+/// complementary grid-snap configs) and a hole is accepted only if the REAL <see cref="Geometry2D.
+/// TriangulatePolygon"/> succeeds on the result — so an out-of-bounds, overlapping, or otherwise un-bridgeable
+/// ring is silently SKIPPED while the others still render, and the combined polygon is always triangulable
+/// (one bad hole can never blank the rest). Walls are emitted only for the holes that bridged, so the cap and
+/// the walls always agree. The bridging + try-both strategy was validated in a standalone harness.
 /// </summary>
 public sealed class PolygonFloorPrimitive : IPrimitive
 {
@@ -60,22 +63,20 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         centre /= pts.Count;
         var centroid2d = new Vector2(centre.X, centre.Z);
 
-        // Optional hole: bridge it into the outline so a single simple polygon triangulates the holed cap.
-        // All-or-nothing — only if the bridge AND its triangulation succeed do we use the holed cap and emit
-        // the hole walls; otherwise the slab stays solid (a ring drawn outside the outline reads as no hole).
-        List<Vector3> hole = ReadPoints(data, "hole");
+        // Holes: bridge each into the outline so a single simple polygon triangulates the holed cap. BridgeMany
+        // accepts a hole ONLY if the real TriangulatePolygon succeeds on the result, so the combined polygon is
+        // always triangulable (a hole that can't bridge cleanly is skipped, never corrupting the others) and the
+        // walls are emitted for exactly the bridged set — cap and walls always agree.
+        List<List<Vector3>> holes = PolygonHoles.Decode(data);
         Vector2[] capVerts = outer2d;
         int[] capTris = null;
-        bool holed = false;
-        if (hole.Count >= 3)
+        List<List<Vector3>> bridged = null;
+        if (holes.Count > 0)
         {
-            var hole2d = new Vector2[hole.Count];
-            for (int i = 0; i < hole.Count; i++) hole2d[i] = new Vector2(hole[i].X, hole[i].Z);
-            List<Vector2> combined = BridgeHole(outer2d, hole2d);
-            int[] ctris = combined != null ? Geometry2D.TriangulatePolygon(combined.ToArray()) : null;
-            if (ctris != null && ctris.Length >= 3) { capVerts = combined.ToArray(); capTris = ctris; holed = true; }
+            (Vector2[] combined, int[] ctris, List<List<Vector3>> br) = BridgeMany(outer2d, holes);
+            if (br.Count > 0 && ctris != null && ctris.Length >= 3) { capVerts = combined; capTris = ctris; bridged = br; }
         }
-        if (!holed) capTris = Geometry2D.TriangulatePolygon(outer2d); // solid; null while non-simple → fan fallback
+        if (bridged == null) capTris = Geometry2D.TriangulatePolygon(outer2d); // solid; null while non-simple → fan
 
         // Surface 0: Top cap (y = 0, faces +Y).  Surface 1: Bottom cap (y = -t, faces -Y).
         SurfaceTool top = Begin();
@@ -87,13 +88,74 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         Commit(bottom, mesh);
 
         // Surface 2: Edge walls — one vertical quad per outline edge (faced outward, away from the centroid),
-        // plus the hole's walls (faced inward, toward the hole centroid) when the hole is live.
+        // plus each bridged hole's walls (faced inward, toward the hole centroid).
         SurfaceTool edge = Begin();
         AddWalls(edge, pts, t, centre, outward: true);
-        if (holed) AddWalls(edge, hole, t, Centroid(hole), outward: false);
+        if (bridged != null)
+            foreach (List<Vector3> ring in bridged) AddWalls(edge, ring, t, Centroid(ring), outward: false);
         Commit(edge, mesh);
 
         return mesh;
+    }
+
+    /// <summary>
+    /// Bridges every hole into the outline, processed right-to-left (max-X descending). Per hole it TRIES BOTH
+    /// bridge variants — vertex-bridge then edge-bridge — and accepts the first whose <see cref="Geometry2D.
+    /// TriangulatePolygon"/> actually succeeds; if neither does (out-of-bounds / overlapping / unresolvable
+    /// degeneracy) the hole is skipped. The two variants pinch on complementary configurations (vertex on
+    /// vertically-stacked / different-size holes, edge on same-band rows), so trying both clears the grid-snap
+    /// degeneracies that a single variant — passing a simple/area check but failing the real triangulator —
+    /// could not. Returns the combined polygon, ITS triangulation (reused by the caller), and the rings that
+    /// bridged (so walls are emitted for exactly those). The strategy was validated in a standalone harness.
+    /// </summary>
+    private static (Vector2[] combined, int[] tris, List<List<Vector3>> bridged) BridgeMany(
+        Vector2[] outer, List<List<Vector3>> holes)
+    {
+        var order = new List<List<Vector3>>(holes);
+        order.Sort((a, b) => MaxX(b).CompareTo(MaxX(a)));
+        var combined = new List<Vector2>(EnsureWinding(outer, ccw: true));
+        int[] tris = Geometry2D.TriangulatePolygon(combined.ToArray());
+        var bridged = new List<List<Vector3>>();
+
+        foreach (List<Vector3> ring in order)
+        {
+            if (ring.Count < 3) continue;
+            var hole2d = new Vector2[ring.Count];
+            for (int i = 0; i < ring.Count; i++) hole2d[i] = new Vector2(ring[i].X, ring[i].Z);
+
+            foreach (bool edge in new[] { false, true }) // vertex-bridge first, then edge-bridge
+            {
+                List<Vector2> cand = edge ? BridgeEdge(combined.ToArray(), hole2d) : BridgeVertex(combined.ToArray(), hole2d);
+                if (cand == null) continue;
+                int[] ct = Geometry2D.TriangulatePolygon(cand.ToArray());
+                if (ct != null && ct.Length >= 3) { combined = cand; tris = ct; bridged.Add(ring); break; }
+            }
+        }
+        return (combined.ToArray(), tris, bridged);
+    }
+
+    /// <summary>The horizontal +X ray from <paramref name="m"/>: the first outline edge it hits, as an edge
+    /// index and the hit point. Returns e = -1 if none (the hole isn't inside).</summary>
+    private static (int e, Vector2 hit) FirstHit(Vector2[] outer, Vector2 m)
+    {
+        int no = outer.Length;
+        float bestX = float.MaxValue; int e = -1; Vector2 hit = default;
+        for (int i = 0; i < no; i++)
+        {
+            Vector2 a = outer[i], b = outer[(i + 1) % no];
+            if ((a.Y > m.Y) == (b.Y > m.Y)) continue;             // edge doesn't straddle the ray
+            float tt = (m.Y - a.Y) / (b.Y - a.Y);
+            float x = a.X + tt * (b.X - a.X);
+            if (x >= m.X - 1e-6f && x < bestX) { bestX = x; e = i; hit = new Vector2(x, m.Y); }
+        }
+        return (e, hit);
+    }
+
+    private static float MaxX(List<Vector3> ring)
+    {
+        float m = float.MinValue;
+        foreach (Vector3 p in ring) if (p.X > m) m = p.X;
+        return m;
     }
 
     /// <summary>Emits a vertical quad per ring edge. <paramref name="outward"/> faces them away from
@@ -176,33 +238,22 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         return pts;
     }
 
-    // --- Hole bridging. Stitches the hole ring into the outline through a zero-width seam so the result is
-    // one simple polygon TriangulatePolygon can handle (CLAUDE.md gotcha #1: don't triangulate a hole
-    // directly). The construction (force outer CCW / hole CW, ray the hole's max-X vertex to the nearest
-    // outline edge, refine to a visible vertex, stitch) was verified to yield a simple polygon across many
-    // cases (off-centre / rotated holes, non-convex and many-sided outlines) in a standalone test harness.
+    // --- Hole bridging. Stitches a hole ring into the outline through a zero-width seam so the result is one
+    // simple polygon TriangulatePolygon can handle (CLAUDE.md gotcha #1: don't triangulate a hole directly).
+    // Two complementary variants (BridgeMany tries both per hole, real-triangulator-gated). Both force outer
+    // CCW / hole CW and ray the hole's max-X vertex +X to the first outline edge. Validated in a harness.
 
-    /// <summary>Outer + hole → one simple polygon (or null if the hole's +X ray misses the outline, i.e. the
-    /// hole isn't inside). Coordinates are (X, Z) packed into a <see cref="Vector2"/>.</summary>
-    private static List<Vector2> BridgeHole(Vector2[] outerIn, Vector2[] holeIn)
+    /// <summary>Bridge to the outline VERTEX nearest the ray hit (visible-vertex refinement). Best when the
+    /// ray lands mid-edge; pinches when several holes pick the same vertex (handled by trying the edge variant).</summary>
+    private static List<Vector2> BridgeVertex(Vector2[] outerIn, Vector2[] holeIn)
     {
         Vector2[] outer = EnsureWinding(outerIn, ccw: true);
         Vector2[] hole = EnsureWinding(holeIn, ccw: false);
         int no = outer.Length, nh = hole.Length;
-
-        int mi = 0;
-        for (int i = 1; i < nh; i++) if (hole[i].X > hole[mi].X) mi = i;
+        int mi = MaxXIndex(hole);
         Vector2 m = hole[mi];
 
-        float bestX = float.MaxValue; int e = -1; Vector2 inter = default;
-        for (int i = 0; i < no; i++)
-        {
-            Vector2 a = outer[i], b = outer[(i + 1) % no];
-            if ((a.Y > m.Y) == (b.Y > m.Y)) continue;            // edge doesn't straddle the horizontal ray
-            float tt = (m.Y - a.Y) / (b.Y - a.Y);
-            float x = a.X + tt * (b.X - a.X);
-            if (x >= m.X - 1e-6f && x < bestX) { bestX = x; e = i; inter = new Vector2(x, m.Y); }
-        }
+        (int e, Vector2 inter) = FirstHit(outer, m);
         if (e < 0) return null;
 
         int pi = outer[e].X > outer[(e + 1) % no].X ? e : (e + 1) % no;
@@ -220,7 +271,7 @@ public sealed class PolygonFloorPrimitive : IPrimitive
             if (len < 1e-9f) continue;
             float cos = d.X / len;
             if (cos > bestCos + 1e-7f || (Mathf.Abs(cos - bestCos) <= 1e-7f && len < bestDist))
-            { bestCos = cos; bestDist = len; pi = i; p = r; } // shrink the triangle as the validated harness does
+            { bestCos = cos; bestDist = len; pi = i; p = r; }
         }
 
         var res = new List<Vector2>();
@@ -229,6 +280,49 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         res.Add(outer[pi]);                                          // bridge back to p
         for (int k = pi + 1; k < no; k++) res.Add(outer[k]);
         return res;
+    }
+
+    /// <summary>Bridge to the ray's first edge-HIT POINT (inserted as a new vertex), so it never shares an
+    /// outline vertex — pinch-free even when several holes lie in the same horizontal band. Snaps to an
+    /// endpoint only if the hit lands exactly on one (avoids a near-duplicate point).</summary>
+    private static List<Vector2> BridgeEdge(Vector2[] outerIn, Vector2[] holeIn)
+    {
+        Vector2[] outer = EnsureWinding(outerIn, ccw: true);
+        Vector2[] hole = EnsureWinding(holeIn, ccw: false);
+        int no = outer.Length, nh = hole.Length;
+        int mi = MaxXIndex(hole);
+        Vector2 m = hole[mi];
+
+        (int e, Vector2 hit) = FirstHit(outer, m);
+        if (e < 0) return null;
+
+        int ea = e, eb = (e + 1) % no;
+        bool atA = (hit - outer[ea]).Length() < 1e-4f, atB = (hit - outer[eb]).Length() < 1e-4f;
+        var res = new List<Vector2>();
+        if (atA || atB)
+        {
+            int pi = atA ? ea : eb;
+            for (int k = 0; k <= pi; k++) res.Add(outer[k]);
+            for (int k = 0; k <= nh; k++) res.Add(hole[(mi + k) % nh]);
+            res.Add(outer[pi]);
+            for (int k = pi + 1; k < no; k++) res.Add(outer[k]);
+        }
+        else
+        {
+            for (int k = 0; k <= e; k++) res.Add(outer[k]);
+            res.Add(hit);                                          // insert the hit point on edge e
+            for (int k = 0; k <= nh; k++) res.Add(hole[(mi + k) % nh]);
+            res.Add(hit);
+            for (int k = e + 1; k < no; k++) res.Add(outer[k]);
+        }
+        return res;
+    }
+
+    private static int MaxXIndex(Vector2[] ring)
+    {
+        int mi = 0;
+        for (int i = 1; i < ring.Length; i++) if (ring[i].X > ring[mi].X) mi = i;
+        return mi;
     }
 
     private static Vector2[] EnsureWinding(Vector2[] p, bool ccw)
