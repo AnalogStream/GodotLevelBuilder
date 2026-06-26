@@ -13,7 +13,7 @@ namespace LevelBuilder.Editor.Gizmos;
 public static class InstanceHandleProvider
 {
     public static List<IEditHandle> Build(PrimitiveInstanceData inst, IPrimitive prim, Vector3 elevationOffset,
-        GridSettings grid, int selectedPathPoint = -1)
+        GridSettings grid, int selectedPathPoint = -1, int selectedHole = -1, System.Action resetSubSelection = null)
     {
         var handles = new List<IEditHandle>();
         if (prim == null) return handles;
@@ -64,19 +64,42 @@ public static class InstanceHandleProvider
                 // >3 corners remain). Adding a corner is a click on the overlay line (EditorContext). No
                 // height/bank (the floor is flat) and no end-extension (the outline is a closed ring).
                 Vector3 polyOff = inst.LocalTransform.Origin + elevationOffset;
+
+                // Outer ring (ring -1): markers per corner; the selected outer corner unfolds move + remove.
                 Godot.Collections.Array<Godot.Vector3> polyPts = PathPoints.Read(inst);
-                int polySel = selectedPathPoint;
                 for (int i = 0; i < polyPts.Count; i++)
                 {
-                    if (i == polySel)
+                    if (selectedHole < 0 && i == selectedPathPoint)
                     {
                         handles.Add(new PolygonPointHandle(inst, i, polyOff, grid.CellSize));
                         if (polyPts.Count > 3) handles.Add(new PolygonRemoveHandle(inst, i, polyOff));
                     }
                     else
                     {
-                        handles.Add(new PathPointMarkerHandle(i, polyOff + polyPts[i], new Color(0.85f, 0.85f, 0.9f)));
+                        handles.Add(new PathPointMarkerHandle(i, polyOff + polyPts[i], new Color(0.85f, 0.85f, 0.9f), ring: -1));
                     }
+                }
+
+                // Holes (ring h, warm markers): the selected hole corner unfolds move + corner-remove (>3),
+                // and the selected hole gets a centre delete-whole-hole widget.
+                System.Collections.Generic.List<System.Collections.Generic.List<Godot.Vector3>> holes = PolygonHoles.Decode(inst);
+                var holeMarker = new Color(1.0f, 0.6f, 0.25f);
+                for (int h = 0; h < holes.Count; h++)
+                {
+                    System.Collections.Generic.List<Godot.Vector3> ring = holes[h];
+                    for (int i = 0; i < ring.Count; i++)
+                    {
+                        if (selectedHole == h && i == selectedPathPoint)
+                        {
+                            handles.Add(new PolygonHolePointHandle(inst, h, i, polyOff, grid.CellSize));
+                            if (ring.Count > 3) handles.Add(new PolygonHoleCornerRemoveHandle(inst, h, i, polyOff));
+                        }
+                        else
+                        {
+                            handles.Add(new PathPointMarkerHandle(i, polyOff + ring[i], holeMarker, ring: h));
+                        }
+                    }
+                    if (selectedHole == h) handles.Add(new PolygonHoleDeleteHandle(inst, h, polyOff, resetSubSelection));
                 }
                 break;
             }

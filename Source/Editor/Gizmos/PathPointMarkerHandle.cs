@@ -16,14 +16,16 @@ public sealed class PathPointMarkerHandle : IEditHandle, IStyledHandle, IPathPoi
     private readonly Vector3 _anchor;
     private readonly Color _color;
 
-    public PathPointMarkerHandle(int index, Vector3 worldAnchor, Color color)
+    public PathPointMarkerHandle(int index, Vector3 worldAnchor, Color color, int ring = -1)
     {
         Index = index;
+        Ring = ring;
         _anchor = worldAnchor;
         _color = color;
     }
 
     public int Index { get; }
+    public int Ring { get; }
 
     public Color WidgetColor => _color;
     public float WidgetScale => 0.6f;

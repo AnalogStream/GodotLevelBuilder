@@ -42,8 +42,21 @@ public partial class PathOverlay : Node3D
     {
         if (_mesh == null) return;
         _mesh.ClearSurfaces();
-        if (points.Count < 2) return;
+        AddRing(points, offset, closed);
+    }
 
+    /// <summary>Draws several rings (outline + holes), each as its OWN line strip — separate surfaces so no
+    /// spurious segment connects the outline to a hole.</summary>
+    public void ShowMany(System.Collections.Generic.IEnumerable<(System.Collections.Generic.IReadOnlyList<Vector3> pts, bool closed)> rings, Vector3 offset)
+    {
+        if (_mesh == null) return;
+        _mesh.ClearSurfaces();
+        foreach ((System.Collections.Generic.IReadOnlyList<Vector3> pts, bool closed) in rings) AddRing(pts, offset, closed);
+    }
+
+    private void AddRing(System.Collections.Generic.IReadOnlyList<Vector3> points, Vector3 offset, bool closed)
+    {
+        if (points.Count < 2) return;
         _mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
         foreach (Vector3 p in points) _mesh.SurfaceAddVertex(offset + p);
         if (closed && points.Count >= 3) _mesh.SurfaceAddVertex(offset + points[0]);

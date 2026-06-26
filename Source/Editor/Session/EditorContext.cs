@@ -69,6 +69,11 @@ public sealed class EditorContext
     /// Positional, so it's cleared on any selection change and clamped against the live point count.</summary>
     public int SelectedPathPoint { get; private set; } = -1;
 
+    /// <summary>Which RING the active control point belongs to for a polygon floor: -1 = the outline (and
+    /// always -1 for a path_sweep, which has no holes), ≥0 = a hole index. Paired with
+    /// <see cref="SelectedPathPoint"/> as the (ring, corner) sub-selection; reset together.</summary>
+    public int SelectedHole { get; private set; } = -1;
+
     /// <summary>True if <paramref name="id"/> is in the current multi-selection.</summary>
     public bool IsSelected(string id) => _selectedIds.Contains(id);
 
@@ -135,8 +140,12 @@ public sealed class EditorContext
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
         return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId),
-            Document.Grid, SelectedPathPoint);
+            Document.Grid, SelectedPathPoint, SelectedHole, ResetSubSelection);
     }
+
+    /// <summary>Drops the (hole, corner) sub-selection. Passed to the delete-whole-hole handle, which shifts
+    /// hole indices, so the selection can't be left pointing at a now-different hole.</summary>
+    private void ResetSubSelection() { SelectedHole = -1; SelectedPathPoint = -1; }
 
     /// <summary>Drops a path-point selection that no longer addresses a live point (count shrank, instance
     /// changed, or it's not a path) so <see cref="DeleteSelected"/> and the gizmo build never read a stale index.</summary>
@@ -155,10 +164,21 @@ public sealed class EditorContext
 
     private void ClampPathSelection()
     {
-        if (SelectedPathPoint < 0) return;
+        if (SelectedPathPoint < 0) { SelectedHole = -1; return; }
         PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
-        int count = HasEditablePoints(inst) ? PathPoints.Read(inst).Count : 0;
-        if (SelectedPathPoint >= count) SelectedPathPoint = -1;
+
+        if (SelectedHole < 0) // outline / path_sweep — unchanged from before holes existed
+        {
+            int count = HasEditablePoints(inst) ? PathPoints.Read(inst).Count : 0;
+            if (SelectedPathPoint >= count) SelectedPathPoint = -1;
+        }
+        else // a polygon-floor hole corner — the index can go stale after a hole add/remove or undo
+        {
+            List<List<Vector3>> holes = inst != null && inst.PrimitiveType == "polygon_floor"
+                ? PolygonHoles.Decode(inst) : new List<List<Vector3>>();
+            if (SelectedHole >= holes.Count || SelectedPathPoint >= holes[SelectedHole].Count)
+            { SelectedHole = -1; SelectedPathPoint = -1; }
+        }
     }
 
     /// <summary>Draws the control polyline when (and only when) a single point-outline primitive is selected.</summary>
@@ -168,8 +188,21 @@ public sealed class EditorContext
         PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
         if (!HasEditablePoints(inst)) { PathOverlay.Clear(); return; }
 
-        Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
-        PathOverlay.Show(pts, inst.LocalTransform.Origin + OffsetOfInstance(SelectedId), OutlineClosed(inst, pts.Count));
+        Vector3 off = inst.LocalTransform.Origin + OffsetOfInstance(SelectedId);
+        if (inst.PrimitiveType == "polygon_floor")
+        {
+            // Outline + every hole as separate closed line strips.
+            var rings = new List<(IReadOnlyList<Vector3> pts, bool closed)>();
+            Godot.Collections.Array<Vector3> outer = PathPoints.Read(inst);
+            rings.Add((outer, outer.Count >= 3));
+            foreach (List<Vector3> hole in PolygonHoles.Decode(inst)) rings.Add((hole, hole.Count >= 3));
+            PathOverlay.ShowMany(rings, off);
+        }
+        else
+        {
+            Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
+            PathOverlay.Show(pts, off, OutlineClosed(inst, pts.Count));
+        }
     }
 
     /// <summary>World offset of the draw plane, where new geometry is drawn.</summary>
@@ -282,6 +315,7 @@ public sealed class EditorContext
         holes.Add(added);
         (Godot.Collections.Array<Vector3> toV, Godot.Collections.Array<float> toS) = PolygonHoles.Encode(holes);
 
+        ResetSubSelection(); // a structural change to the hole set — don't leave a stale (hole, corner) active
         Commands.Execute(new SetHolesCommand(inst, fromV, fromS, toV, toS, Refresh));
         GD.Print($"[cut hole] polygon now has {holes.Count} hole(s) in data (skipped ones won't render)");
     }
@@ -394,14 +428,19 @@ public sealed class EditorContext
         if (id != null) _selectedIds.Add(id);
         SelectedOpeningId = null;
         SelectedPathPoint = -1;
+        SelectedHole = -1;
         Refresh();
     }
 
-    /// <summary>Makes <paramref name="index"/> the active path control point (or -1 to clear). Transient
-    /// view state, NOT a command — the instance selection is untouched; only which point shows its gizmos
-    /// changes. Mirrors <see cref="SelectOpening"/>'s no-command sub-selection.</summary>
-    public void SelectPathPoint(int index)
+    /// <summary>Makes <paramref name="index"/> the active control point of the outline / a path (-1 to clear).</summary>
+    public void SelectPathPoint(int index) => SelectRingPoint(-1, index);
+
+    /// <summary>Makes corner <paramref name="index"/> of ring <paramref name="ring"/> active (ring -1 = the
+    /// outline / a path's points; ≥0 = a polygon-floor hole). Transient view state, NOT a command — the
+    /// instance selection is untouched; only which corner shows its gizmos changes.</summary>
+    public void SelectRingPoint(int ring, int index)
     {
+        SelectedHole = ring;
         SelectedPathPoint = index;
         Refresh();
     }
@@ -451,6 +490,7 @@ public sealed class EditorContext
 
         Godot.Collections.Array<Vector3> toPts = pts.Duplicate();
         toPts.Insert(at, newPt);
+        SelectedHole = -1;      // insert targets the OUTER ring (hole-line insert is a later slice)
         SelectedPathPoint = at; // the command's Refresh then unfolds the new point's gizmos
 
         if (inst.PrimitiveType == "path_sweep")
@@ -477,6 +517,7 @@ public sealed class EditorContext
             if (id != null && !_selectedIds.Contains(id)) _selectedIds.Add(id);
         SelectedOpeningId = null;
         SelectedPathPoint = -1;
+        SelectedHole = -1;
         Refresh();
     }
 
@@ -487,6 +528,7 @@ public sealed class EditorContext
         if (id == null) return;
         SelectedOpeningId = null;
         SelectedPathPoint = -1;
+        SelectedHole = -1;
         if (!_selectedIds.Remove(id)) _selectedIds.Add(id);
         Refresh();
     }
@@ -507,11 +549,32 @@ public sealed class EditorContext
         _selectedIds.Clear();
         SelectedOpeningId = null;
         SelectedPathPoint = -1;
+        SelectedHole = -1;
         Refresh();
     }
 
     public void DeleteSelected()
     {
+        // A selected HOLE corner: Delete removes that corner, or the whole hole if it would drop below a
+        // triangle. (Checked before the outline branch, which also matches SelectedPathPoint >= 0.)
+        if (SelectedHole >= 0 && SelectedPathPoint >= 0 && SelectedOpeningId == null && _selectedIds.Count == 1)
+        {
+            PrimitiveInstanceData poly = GetInstance(SelectedId);
+            if (poly != null && poly.PrimitiveType == "polygon_floor")
+            {
+                List<List<Vector3>> from = PolygonHoles.Decode(poly);
+                if (SelectedHole < from.Count && SelectedPathPoint < from[SelectedHole].Count)
+                {
+                    List<List<Vector3>> to = PolygonHoleOps.Clone(from);
+                    to[SelectedHole].RemoveAt(SelectedPathPoint);
+                    if (to[SelectedHole].Count < 3) to.RemoveAt(SelectedHole); // hole fell below a triangle
+                    SelectedHole = -1; SelectedPathPoint = -1;
+                    Commands.Execute(PolygonHoleOps.Command(poly, from, to, Refresh));
+                }
+                return; // a hole corner was the target — don't fall through to the outline / instance delete
+            }
+        }
+
         // A selected outline control point: Delete removes just that point (not the whole instance), as long
         // as enough remain to stay drawable — a path keeps ≥2 (a line), a polygon floor ≥3 (a triangle).
         if (SelectedPathPoint >= 0 && SelectedOpeningId == null && _selectedIds.Count == 1)
@@ -614,6 +677,7 @@ public sealed class EditorContext
         _selectedIds.Clear();
         SelectedOpeningId = null;
         SelectedPathPoint = -1;
+        SelectedHole = -1;
         View.Setup(doc, Registry); // re-target + drop stale material cache; Rebuild (below) clears old meshes
         Commands.Clear();
         SetActiveStorey(doc.Storeys[0]); // positions grid/cursor at the ground storey

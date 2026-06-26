@@ -8,6 +8,9 @@ namespace LevelBuilder.Editor.Gizmos;
 /// </summary>
 public interface IPathPointSelect
 {
-    /// <summary>Index of the control point this marker represents.</summary>
+    /// <summary>Which ring the point belongs to: -1 = the outline / a path's points, ≥0 = a polygon-floor hole index.</summary>
+    int Ring { get; }
+
+    /// <summary>Index of the control point this marker represents within its ring.</summary>
     int Index { get; }
 }

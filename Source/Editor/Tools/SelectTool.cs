@@ -43,7 +43,7 @@ public sealed class SelectTool : ITool
             {
                 IEditHandle h = _ctx.Handles[r.HandleIndex];
                 // A path-point marker selects that point (view state) rather than starting a drag.
-                if (h is IPathPointSelect ps) { _ctx.SelectPathPoint(ps.Index); return; }
+                if (h is IPathPointSelect ps) { _ctx.SelectRingPoint(ps.Ring, ps.Index); return; }
                 Begin(h); // Resize/move: grab the gizmo handle without changing the selection.
             }
             return;
