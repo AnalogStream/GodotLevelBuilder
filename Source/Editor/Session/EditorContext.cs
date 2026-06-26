@@ -140,24 +140,36 @@ public sealed class EditorContext
 
     /// <summary>Drops a path-point selection that no longer addresses a live point (count shrank, instance
     /// changed, or it's not a path) so <see cref="DeleteSelected"/> and the gizmo build never read a stale index.</summary>
+    /// <summary>True for primitives whose outline is an editable control-point array — path sweep and
+    /// polygon floor. They share the Path3D-style point-edit scaffolding (selection, overlay, click-on-line
+    /// insert, point delete); a polygon floor is just a closed, planar, bank-free instance of it.</summary>
+    private static bool HasEditablePoints(PrimitiveInstanceData inst)
+        => inst != null && (inst.PrimitiveType == "path_sweep" || inst.PrimitiveType == "polygon_floor");
+
+    /// <summary>A point-outline primitive's outline is a closed ring (polygon floor always; path sweep when
+    /// its "closed" param is set and it has ≥3 points).</summary>
+    private static bool OutlineClosed(PrimitiveInstanceData inst, int pointCount)
+        => inst.PrimitiveType == "polygon_floor"
+            ? pointCount >= 3
+            : inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool() && pointCount >= 3;
+
     private void ClampPathSelection()
     {
         if (SelectedPathPoint < 0) return;
         PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
-        int count = inst != null && inst.PrimitiveType == "path_sweep" ? PathPoints.Read(inst).Count : 0;
+        int count = HasEditablePoints(inst) ? PathPoints.Read(inst).Count : 0;
         if (SelectedPathPoint >= count) SelectedPathPoint = -1;
     }
 
-    /// <summary>Draws the control polyline when (and only when) a single path_sweep is selected.</summary>
+    /// <summary>Draws the control polyline when (and only when) a single point-outline primitive is selected.</summary>
     private void RenderPathOverlay()
     {
         if (PathOverlay == null) return;
         PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
-        if (inst == null || inst.PrimitiveType != "path_sweep") { PathOverlay.Clear(); return; }
+        if (!HasEditablePoints(inst)) { PathOverlay.Clear(); return; }
 
         Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
-        bool closed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool() && pts.Count >= 3;
-        PathOverlay.Show(pts, inst.LocalTransform.Origin + OffsetOfInstance(SelectedId), closed);
+        PathOverlay.Show(pts, inst.LocalTransform.Origin + OffsetOfInstance(SelectedId), OutlineClosed(inst, pts.Count));
     }
 
     /// <summary>World offset of the draw plane, where new geometry is drawn.</summary>
@@ -385,14 +397,14 @@ public sealed class EditorContext
     {
         if (_selectedIds.Count != 1 || SelectedOpeningId != null) return false;
         PrimitiveInstanceData inst = GetInstance(SelectedId);
-        if (inst == null || inst.PrimitiveType != "path_sweep") return false;
+        if (!HasEditablePoints(inst)) return false;
 
         Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
         if (pts.Count < 2) return false;
         if (!Picker.MouseRay(out Vector3 from, out Vector3 dir)) return false;
 
         Vector3 off = inst.LocalTransform.Origin + OffsetOfInstance(SelectedId);
-        bool closed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool() && pts.Count >= 3;
+        bool closed = OutlineClosed(inst, pts.Count);
         int segCount = closed ? pts.Count : pts.Count - 1;
 
         // Nearest segment to the cursor RAY in 3D (so a climbing/looping path works, not just a flat one).
@@ -416,16 +428,24 @@ public sealed class EditorContext
         Vector3 local = bestWorld - off;
         float cell = Document.Grid.CellSize;
         var newPt = new Vector3(Mathf.Round(local.X / cell) * cell, local.Y, Mathf.Round(local.Z / cell) * cell);
-        Godot.Collections.Array<float> banks = PathPoints.ReadBanks(inst, pts.Count);
         int at = bestSeg + 1;
 
         Godot.Collections.Array<Vector3> toPts = pts.Duplicate();
         toPts.Insert(at, newPt);
-        Godot.Collections.Array<float> toBanks = banks.Duplicate();
-        toBanks.Insert(at, Mathf.Lerp(banks[bestSeg], banks[(bestSeg + 1) % pts.Count], bestT));
-
         SelectedPathPoint = at; // the command's Refresh then unfolds the new point's gizmos
-        Commands.Execute(new EditPathCommand(inst, pts, banks, toPts, toBanks, Refresh));
+
+        if (inst.PrimitiveType == "path_sweep")
+        {
+            // Path: keep the parallel bank array length-aligned (new point gets the segment's lerped bank).
+            Godot.Collections.Array<float> banks = PathPoints.ReadBanks(inst, pts.Count);
+            Godot.Collections.Array<float> toBanks = banks.Duplicate();
+            toBanks.Insert(at, Mathf.Lerp(banks[bestSeg], banks[(bestSeg + 1) % pts.Count], bestT));
+            Commands.Execute(new EditPathCommand(inst, pts, banks, toPts, toBanks, Refresh));
+        }
+        else
+        {
+            Commands.Execute(new EditPointsCommand(inst, pts, toPts, Refresh)); // polygon floor: points only
+        }
         return true;
     }
 
@@ -473,24 +493,34 @@ public sealed class EditorContext
 
     public void DeleteSelected()
     {
-        // A selected path control point: Delete removes just that point (not the whole path), while >2 remain.
+        // A selected outline control point: Delete removes just that point (not the whole instance), as long
+        // as enough remain to stay drawable — a path keeps ≥2 (a line), a polygon floor ≥3 (a triangle).
         if (SelectedPathPoint >= 0 && SelectedOpeningId == null && _selectedIds.Count == 1)
         {
-            PrimitiveInstanceData path = GetInstance(SelectedId);
-            if (path != null && path.PrimitiveType == "path_sweep")
+            PrimitiveInstanceData outline = GetInstance(SelectedId);
+            if (HasEditablePoints(outline))
             {
-                Godot.Collections.Array<Vector3> pts = PathPoints.Read(path);
-                if (SelectedPathPoint < pts.Count && pts.Count > 2)
+                Godot.Collections.Array<Vector3> pts = PathPoints.Read(outline);
+                int min = outline.PrimitiveType == "polygon_floor" ? 3 : 2;
+                if (SelectedPathPoint < pts.Count && pts.Count > min)
                 {
-                    Godot.Collections.Array<float> banks = PathPoints.ReadBanks(path, pts.Count);
+                    int removed = SelectedPathPoint;
                     Godot.Collections.Array<Vector3> toPts = pts.Duplicate();
-                    Godot.Collections.Array<float> toBanks = banks.Duplicate();
-                    toPts.RemoveAt(SelectedPathPoint);
-                    toBanks.RemoveAt(SelectedPathPoint);
+                    toPts.RemoveAt(removed);
                     SelectedPathPoint = -1;
-                    Commands.Execute(new EditPathCommand(path, pts, banks, toPts, toBanks, Refresh));
+                    if (outline.PrimitiveType == "path_sweep")
+                    {
+                        Godot.Collections.Array<float> banks = PathPoints.ReadBanks(outline, pts.Count);
+                        Godot.Collections.Array<float> toBanks = banks.Duplicate();
+                        toBanks.RemoveAt(removed);
+                        Commands.Execute(new EditPathCommand(outline, pts, banks, toPts, toBanks, Refresh));
+                    }
+                    else
+                    {
+                        Commands.Execute(new EditPointsCommand(outline, pts, toPts, Refresh));
+                    }
                 }
-                return; // a path point was the selection target — don't fall through to instance delete
+                return; // an outline point was the selection target — don't fall through to instance delete
             }
         }
 

@@ -57,6 +57,29 @@ public static class InstanceHandleProvider
                 }
                 break;
             }
+            case "polygon_floor":
+            {
+                // Same Path3D-style editing as path_sweep, but planar: every corner shows a select marker;
+                // only the SELECTED corner unfolds its gizmos (an X/Z mover, plus a remove widget while
+                // >3 corners remain). Adding a corner is a click on the overlay line (EditorContext). No
+                // height/bank (the floor is flat) and no end-extension (the outline is a closed ring).
+                Vector3 polyOff = inst.LocalTransform.Origin + elevationOffset;
+                Godot.Collections.Array<Godot.Vector3> polyPts = PathPoints.Read(inst);
+                int polySel = selectedPathPoint;
+                for (int i = 0; i < polyPts.Count; i++)
+                {
+                    if (i == polySel)
+                    {
+                        handles.Add(new PolygonPointHandle(inst, i, polyOff, grid.CellSize));
+                        if (polyPts.Count > 3) handles.Add(new PolygonRemoveHandle(inst, i, polyOff));
+                    }
+                    else
+                    {
+                        handles.Add(new PathPointMarkerHandle(i, polyOff + polyPts[i], new Color(0.85f, 0.85f, 0.9f)));
+                    }
+                }
+                break;
+            }
             case "floor":
             {
                 float w = GetF(inst, "width", 4f), d = GetF(inst, "depth", 4f), t = GetF(inst, "thickness", 0.2f);
