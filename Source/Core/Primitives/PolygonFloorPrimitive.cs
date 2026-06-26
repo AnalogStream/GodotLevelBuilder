@@ -47,15 +47,17 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         new ParamSpec("rail",       "Rail",        ParamType.Int,   0, 0f, 3f, new[] { "None", "Rail", "Elevated Rail", "Bank" }),
         new ParamSpec("railHeight", "Rail Height", ParamType.Float, 0.4f, 0.02f, 50f),
         new ParamSpec("railWidth",  "Rail Width",  ParamType.Float, 0.2f, 0.02f, 50f),
-        // Bank slope from horizontal (degrees): the wedge drops railHeight over a run of height/tan(angle),
-        // so a small angle is a long shallow ramp and a large angle a short steep one. Ignored unless Bank.
-        new ParamSpec("bankAngle",  "Bank Angle",  ParamType.Float, 45f, 5f, 85f),
+        // Bank slope from horizontal (degrees): the wedge drops railHeight over a run of height/tan(|angle|),
+        // so a small magnitude is a long shallow ramp and a large one a short steep ramp. The SIGN sets which
+        // way it leans: positive = high lip at the OUTER edge sloping inward (funnels toward centre); negative
+        // = high lip at the INNER edge sloping back out toward the outline. Ignored unless Bank.
+        new ParamSpec("bankAngle",  "Bank Angle",  ParamType.Float, 45f, -85f, 85f),
         // Independent rim for the HOLE perimeters (same four styles + its own Height/Width/Bank Angle), so
         // holes can carry a different rail than the outer outline — or none at all. Append-only enum.
         new ParamSpec("holeRail",       "Hole Rail",        ParamType.Int,   0, 0f, 3f, new[] { "None", "Rail", "Elevated Rail", "Bank" }),
         new ParamSpec("holeRailHeight", "Hole Rail Height", ParamType.Float, 0.4f, 0.02f, 50f),
         new ParamSpec("holeRailWidth",  "Hole Rail Width",  ParamType.Float, 0.2f, 0.02f, 50f),
-        new ParamSpec("holeBankAngle",  "Hole Bank Angle",  ParamType.Float, 45f, 5f, 85f),
+        new ParamSpec("holeBankAngle",  "Hole Bank Angle",  ParamType.Float, 45f, -85f, 85f),
     };
 
     // "Rail" is a TRAILING, CONDITIONAL slot: surface 3 is emitted only when rail != None (like the dome's
@@ -263,23 +265,25 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         if (style == 0) return false;
         float limit = 0.45f * MinEdge(poly);                 // keep the inset from inverting on small rings
         w = Mathf.Min(w, limit);
-        float run = style == 3                               // Bank: angle-driven run; others use the width
-            ? h / Mathf.Tan(Mathf.DegToRad(Mathf.Clamp(bankAngleDeg, 5f, 85f)))
-            : w;
+        // Bank: |angle| sets the run (steepness); its sign sets which way the wedge leans (BuildBank's flip).
+        // Clamp the magnitude away from 0 so tan can't blow the run up to infinity.
+        bool bankFlip = bankAngleDeg < 0f;
+        float mag = Mathf.Clamp(Mathf.Abs(bankAngleDeg), 5f, 85f);
+        float run = style == 3 ? h / Mathf.Tan(Mathf.DegToRad(mag)) : w;
         run = Mathf.Min(run, limit);
         Vector2[] inset = InsetRing(poly, centroid, inward ? run : -run);
-        return BuildRail(rail, poly, inset, style, h, w);
+        return BuildRail(rail, poly, inset, style, h, w, bankFlip);
     }
 
     /// <summary>Dispatches the rail style. Returns false (nothing emitted) for an unknown style so the caller
     /// skips committing an empty surface. <paramref name="w"/> is the rail width (inset / post-beam size).</summary>
-    private static bool BuildRail(SurfaceTool rail, Vector2[] outer, Vector2[] inset, int style, float h, float w)
+    private static bool BuildRail(SurfaceTool rail, Vector2[] outer, Vector2[] inset, int style, float h, float w, bool bankFlip)
     {
         switch (style)
         {
-            case 1: BuildCurb(rail, outer, inset, h); return true;     // solid curb/lip
-            case 2: BuildFence(rail, outer, h, w); return true;        // posts + top beam
-            case 3: BuildBank(rail, outer, inset, h); return true;     // angled wedge
+            case 1: BuildCurb(rail, outer, inset, h); return true;        // solid curb/lip
+            case 2: BuildFence(rail, outer, h, w); return true;          // posts + top beam
+            case 3: BuildBank(rail, outer, inset, h, bankFlip); return true; // angled wedge
             default: return false;
         }
     }
@@ -306,12 +310,13 @@ public sealed class PolygonFloorPrimitive : IPrimitive
         }
     }
 
-    /// <summary>Angled bank: a wedge per edge — a vertical outer wall at the outline (the high lip) and an
-    /// inward slope from that lip's top down to the slab at the inset, so the perimeter funnels the ball back
-    /// toward the centre. The slope's angle is set by the caller via the inset distance (run = h/tan(angle)).
-    /// Underside sits flush on the slab. Adjacent wedges share their outer-top and inset-floor vertices
-    /// (mitered inset), so the join is watertight without end caps.</summary>
-    private static void BuildBank(SurfaceTool rail, Vector2[] outer, Vector2[] inset, float h)
+    /// <summary>Angled bank: a wedge per edge — a vertical lip plus a slope between the outline and the inset.
+    /// The slope's angle is set by the caller via the inset distance (run = h/tan(angle)). By default the lip
+    /// is at the OUTLINE and the slope falls inward to the slab at the inset (funnels toward centre). When
+    /// <paramref name="flip"/> is set the wedge LEANS THE OTHER WAY — the lip moves to the INSET and the slope
+    /// falls back out to the slab at the outline. Underside sits flush on the slab; adjacent wedges share their
+    /// lip-top and floor vertices (mitered inset), so the join is watertight without end caps.</summary>
+    private static void BuildBank(SurfaceTool rail, Vector2[] outer, Vector2[] inset, float h, bool flip)
     {
         int n = outer.Length;
         for (int i = 0; i < n; i++)
@@ -324,8 +329,16 @@ public sealed class PolygonFloorPrimitive : IPrimitive
             Vector3 outward = Lo(a) + Lo(b) - Lo(ai) - Lo(bi); outward.Y = 0;
             if (outward.LengthSquared() < 1e-9f) outward = Vector3.Right;
 
-            MeshBuilder.AddQuadFacing(rail, Lo(a), Lo(b), Hi(b), Hi(a), outward);          // vertical outer lip
-            MeshBuilder.AddQuadFacing(rail, Hi(a), Hi(b), Lo(bi), Lo(ai), Vector3.Up);     // inward slope (faces up+in)
+            if (!flip)
+            {
+                MeshBuilder.AddQuadFacing(rail, Lo(a), Lo(b), Hi(b), Hi(a), outward);       // vertical outer lip
+                MeshBuilder.AddQuadFacing(rail, Hi(a), Hi(b), Lo(bi), Lo(ai), Vector3.Up);  // slope falls inward
+            }
+            else
+            {
+                MeshBuilder.AddQuadFacing(rail, Lo(ai), Lo(bi), Hi(bi), Hi(ai), -outward);  // vertical inner lip
+                MeshBuilder.AddQuadFacing(rail, Hi(ai), Hi(bi), Lo(b), Lo(a), Vector3.Up);  // slope falls outward
+            }
         }
     }
 
