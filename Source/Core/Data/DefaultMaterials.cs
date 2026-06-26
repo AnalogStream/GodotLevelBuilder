@@ -26,7 +26,7 @@ public static class DefaultMaterials
     public static IReadOnlyDictionary<string, string> SlotsFor(string primitiveType) => primitiveType switch
     {
         "floor" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim },
-        "polygon_floor" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim },
+        "polygon_floor" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim, ["Rail"] = Wall },
         "wall" => new Dictionary<string, string>
         {
             ["Front"] = Wall, ["Back"] = Wall, ["Top"] = Trim, ["Ends"] = Trim, ["Reveal"] = Trim,
