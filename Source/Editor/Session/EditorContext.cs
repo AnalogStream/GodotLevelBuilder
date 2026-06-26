@@ -45,6 +45,8 @@ public sealed class EditorContext
     public Node3D PreviewLayer { get; init; }
     public InstancePicker Picker { get; init; }
     public GizmoLayer Gizmos { get; init; }
+    /// <summary>Draws the selected path_sweep's control polyline (visual only). Set by Main.</summary>
+    public PathOverlay PathOverlay { get; init; }
     /// <summary>Persistent app settings (workspace + target + last level). Set by Main.</summary>
     public AppConfig Config { get; init; }
     /// <summary>Cancels any in-progress tool op before a document swap. Wired by Main to ToolManager.CancelActive.</summary>
@@ -61,6 +63,11 @@ public sealed class EditorContext
     public string SelectedId => _selectedIds.Count > 0 ? _selectedIds[^1] : null;
     /// <summary>Non-null when an opening is selected; <see cref="SelectedId"/> is then its owning wall.</summary>
     public string SelectedOpeningId { get; private set; }
+
+    /// <summary>The active control point of the selected path_sweep (-1 = none). A refinement ON TOP of the
+    /// instance selection (the instance stays selected): only this point shows its full move/bank gizmos.
+    /// Positional, so it's cleared on any selection change and clamped against the live point count.</summary>
+    public int SelectedPathPoint { get; private set; } = -1;
 
     /// <summary>True if <paramref name="id"/> is in the current multi-selection.</summary>
     public bool IsSelected(string id) => _selectedIds.Contains(id);
@@ -107,10 +114,12 @@ public sealed class EditorContext
     /// </summary>
     public void Refresh()
     {
+        ClampPathSelection(); // a positional index can go stale after an insert/remove/undo — keep it honest
         View.SetSelection(_selectedIds, SelectedOpeningId);
         _handles = BuildHandles();
         View.Rebuild();
         Gizmos.Rebuild(_handles);
+        RenderPathOverlay();
         Changed?.Invoke();
     }
 
@@ -125,7 +134,30 @@ public sealed class EditorContext
         if (_selectedIds.Count != 1) return new List<IEditHandle>();
         PrimitiveInstanceData inst = GetInstance(SelectedId);
         if (inst == null) return new List<IEditHandle>();
-        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId), Document.Grid);
+        return InstanceHandleProvider.Build(inst, Registry.Get(inst.PrimitiveType), OffsetOfInstance(SelectedId),
+            Document.Grid, SelectedPathPoint);
+    }
+
+    /// <summary>Drops a path-point selection that no longer addresses a live point (count shrank, instance
+    /// changed, or it's not a path) so <see cref="DeleteSelected"/> and the gizmo build never read a stale index.</summary>
+    private void ClampPathSelection()
+    {
+        if (SelectedPathPoint < 0) return;
+        PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
+        int count = inst != null && inst.PrimitiveType == "path_sweep" ? PathPoints.Read(inst).Count : 0;
+        if (SelectedPathPoint >= count) SelectedPathPoint = -1;
+    }
+
+    /// <summary>Draws the control polyline when (and only when) a single path_sweep is selected.</summary>
+    private void RenderPathOverlay()
+    {
+        if (PathOverlay == null) return;
+        PrimitiveInstanceData inst = _selectedIds.Count == 1 && SelectedOpeningId == null ? GetInstance(SelectedId) : null;
+        if (inst == null || inst.PrimitiveType != "path_sweep") { PathOverlay.Clear(); return; }
+
+        Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
+        bool closed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool() && pts.Count >= 3;
+        PathOverlay.Show(pts, inst.LocalTransform.Origin + OffsetOfInstance(SelectedId), closed);
     }
 
     /// <summary>World offset of the draw plane, where new geometry is drawn.</summary>
@@ -330,7 +362,71 @@ public sealed class EditorContext
         _selectedIds.Clear();
         if (id != null) _selectedIds.Add(id);
         SelectedOpeningId = null;
+        SelectedPathPoint = -1;
         Refresh();
+    }
+
+    /// <summary>Makes <paramref name="index"/> the active path control point (or -1 to clear). Transient
+    /// view state, NOT a command — the instance selection is untouched; only which point shows its gizmos
+    /// changes. Mirrors <see cref="SelectOpening"/>'s no-command sub-selection.</summary>
+    public void SelectPathPoint(int index)
+    {
+        SelectedPathPoint = index;
+        Refresh();
+    }
+
+    /// <summary>
+    /// Click-on-line insert (Path3D-style): if a single path_sweep is selected and the cursor ray lands
+    /// near one of its segments, inserts a new control point there (grid-snapped, bank interpolated) and
+    /// makes it the active point. Returns false (so the caller can fall through to a normal click) when no
+    /// path is selected or the click isn't close enough to the line. Undoable.
+    /// </summary>
+    public bool TryInsertPathPointAtCursor()
+    {
+        if (_selectedIds.Count != 1 || SelectedOpeningId != null) return false;
+        PrimitiveInstanceData inst = GetInstance(SelectedId);
+        if (inst == null || inst.PrimitiveType != "path_sweep") return false;
+
+        Godot.Collections.Array<Vector3> pts = PathPoints.Read(inst);
+        if (pts.Count < 2) return false;
+        if (!Picker.MouseRay(out Vector3 from, out Vector3 dir)) return false;
+
+        Vector3 off = inst.LocalTransform.Origin + OffsetOfInstance(SelectedId);
+        bool closed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool() && pts.Count >= 3;
+        int segCount = closed ? pts.Count : pts.Count - 1;
+
+        // Nearest segment to the cursor RAY in 3D (so a climbing/looping path works, not just a flat one).
+        float bestDist = float.MaxValue;
+        int bestSeg = -1;
+        float bestT = 0f;
+        Vector3 bestWorld = default;
+        for (int i = 0; i < segCount; i++)
+        {
+            GizmoMath.ClosestRaySegment(from, dir, off + pts[i], off + pts[(i + 1) % pts.Count],
+                out Vector3 segPoint, out float t, out float d);
+            if (d < bestDist) { bestDist = d; bestSeg = i; bestT = t; bestWorld = segPoint; }
+        }
+
+        // Accept only if the click landed within a few pixels of the line on screen (zoom-independent —
+        // a world threshold goes sub-pixel when zoomed out). Off the line → false, so the click clears.
+        const float PixelThreshold = 10f;
+        if (bestSeg < 0 || !Picker.WorldToScreen(bestWorld, out Vector2 screen)
+            || screen.DistanceTo(Picker.MouseScreen()) > PixelThreshold) return false;
+
+        Vector3 local = bestWorld - off;
+        float cell = Document.Grid.CellSize;
+        var newPt = new Vector3(Mathf.Round(local.X / cell) * cell, local.Y, Mathf.Round(local.Z / cell) * cell);
+        Godot.Collections.Array<float> banks = PathPoints.ReadBanks(inst, pts.Count);
+        int at = bestSeg + 1;
+
+        Godot.Collections.Array<Vector3> toPts = pts.Duplicate();
+        toPts.Insert(at, newPt);
+        Godot.Collections.Array<float> toBanks = banks.Duplicate();
+        toBanks.Insert(at, Mathf.Lerp(banks[bestSeg], banks[(bestSeg + 1) % pts.Count], bestT));
+
+        SelectedPathPoint = at; // the command's Refresh then unfolds the new point's gizmos
+        Commands.Execute(new EditPathCommand(inst, pts, banks, toPts, toBanks, Refresh));
+        return true;
     }
 
     /// <summary>Replaces the selection with exactly <paramref name="ids"/> (order preserved, last = primary).
@@ -341,6 +437,7 @@ public sealed class EditorContext
         foreach (string id in ids)
             if (id != null && !_selectedIds.Contains(id)) _selectedIds.Add(id);
         SelectedOpeningId = null;
+        SelectedPathPoint = -1;
         Refresh();
     }
 
@@ -350,6 +447,7 @@ public sealed class EditorContext
     {
         if (id == null) return;
         SelectedOpeningId = null;
+        SelectedPathPoint = -1;
         if (!_selectedIds.Remove(id)) _selectedIds.Add(id);
         Refresh();
     }
@@ -360,19 +458,42 @@ public sealed class EditorContext
         _selectedIds.Clear();
         _selectedIds.Add(wallId);
         SelectedOpeningId = openingId;
+        SelectedPathPoint = -1;
         Refresh();
     }
 
     public void ClearSelection()
     {
-        if (_selectedIds.Count == 0 && SelectedOpeningId == null) return;
+        if (_selectedIds.Count == 0 && SelectedOpeningId == null && SelectedPathPoint < 0) return;
         _selectedIds.Clear();
         SelectedOpeningId = null;
+        SelectedPathPoint = -1;
         Refresh();
     }
 
     public void DeleteSelected()
     {
+        // A selected path control point: Delete removes just that point (not the whole path), while >2 remain.
+        if (SelectedPathPoint >= 0 && SelectedOpeningId == null && _selectedIds.Count == 1)
+        {
+            PrimitiveInstanceData path = GetInstance(SelectedId);
+            if (path != null && path.PrimitiveType == "path_sweep")
+            {
+                Godot.Collections.Array<Vector3> pts = PathPoints.Read(path);
+                if (SelectedPathPoint < pts.Count && pts.Count > 2)
+                {
+                    Godot.Collections.Array<float> banks = PathPoints.ReadBanks(path, pts.Count);
+                    Godot.Collections.Array<Vector3> toPts = pts.Duplicate();
+                    Godot.Collections.Array<float> toBanks = banks.Duplicate();
+                    toPts.RemoveAt(SelectedPathPoint);
+                    toBanks.RemoveAt(SelectedPathPoint);
+                    SelectedPathPoint = -1;
+                    Commands.Execute(new EditPathCommand(path, pts, banks, toPts, toBanks, Refresh));
+                }
+                return; // a path point was the selection target — don't fall through to instance delete
+            }
+        }
+
         if (SelectedOpeningId != null)
         {
             (PrimitiveInstanceData wall, OpeningData opening) = FindOpening(SelectedId, SelectedOpeningId);
@@ -443,6 +564,7 @@ public sealed class EditorContext
         Document = doc;
         _selectedIds.Clear();
         SelectedOpeningId = null;
+        SelectedPathPoint = -1;
         View.Setup(doc, Registry); // re-target + drop stale material cache; Rebuild (below) clears old meshes
         Commands.Clear();
         SetActiveStorey(doc.Storeys[0]); // positions grid/cursor at the ground storey

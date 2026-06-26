@@ -13,7 +13,7 @@ namespace LevelBuilder.Editor.Gizmos;
 public static class InstanceHandleProvider
 {
     public static List<IEditHandle> Build(PrimitiveInstanceData inst, IPrimitive prim, Vector3 elevationOffset,
-        GridSettings grid)
+        GridSettings grid, int selectedPathPoint = -1)
     {
         var handles = new List<IEditHandle>();
         if (prim == null) return handles;
@@ -25,25 +25,31 @@ public static class InstanceHandleProvider
         {
             case "path_sweep":
             {
-                // Per control point: an X/Z planar mover + a vertical (height) mover, plus a remove widget
-                // (only while >2 points remain). Per segment: a midpoint insert widget. The path is fully
-                // described by its points (identity basis), so anchors are just worldOffset + localPoint.
+                // Path3D-style: every point shows a small click-to-select marker; only the SELECTED point
+                // unfolds its full gizmo set (X/Z mover + vertical mover + bank + remove). Adding a point
+                // mid-path is a click on the overlay line (EditorContext), not a per-segment widget — keeps
+                // the view uncluttered. The path is fully described by its points (identity basis), so
+                // anchors are just worldOffset + localPoint.
                 Vector3 off = inst.LocalTransform.Origin + elevationOffset;
                 Godot.Collections.Array<Godot.Vector3> pts = PathPoints.Read(inst);
                 bool pathClosed = inst.Parameters.ContainsKey("closed") && inst.Parameters["closed"].AsBool()
                                   && pts.Count >= 3;
+                int sel = selectedPathPoint; // a stale index (≥ count after a delete) just shows no gizmos
                 for (int i = 0; i < pts.Count; i++)
                 {
-                    handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: false));
-                    handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: true));
-                    handles.Add(new PathBankHandle(inst, i, off + pts[i], PathLateral(pts, i)));
-                    if (pts.Count > 2) handles.Add(new PathRemoveHandle(inst, i, off));
+                    if (i == sel)
+                    {
+                        handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: false));
+                        handles.Add(new PathPointHandle(inst, i, off, grid.CellSize, grid.HeightStep, vertical: true));
+                        handles.Add(new PathBankHandle(inst, i, off + pts[i], PathLateral(pts, i)));
+                        if (pts.Count > 2) handles.Add(new PathRemoveHandle(inst, i, off));
+                    }
+                    else
+                    {
+                        handles.Add(new PathPointMarkerHandle(i, off + pts[i], PointMarkerColor(i, pts.Count)));
+                    }
                 }
-                // One insert per segment; a closed path also gets one on the wrap-around closing segment.
-                int segCount = pathClosed ? pts.Count : pts.Count - 1;
-                for (int i = 0; i < segCount; i++)
-                    handles.Add(new PathInsertHandle(inst, i, off, grid.CellSize));
-                // Open paths can also grow past either end (drag a new point off the first/last point).
+                // Open paths can grow past either end (drag a new point off the first/last point).
                 if (!pathClosed && pts.Count >= 2)
                 {
                     handles.Add(new PathExtendHandle(inst, atStart: true, off, grid.CellSize));
@@ -251,6 +257,14 @@ public static class InstanceHandleProvider
         var arr = new OpeningData[openings.Count];
         for (int i = 0; i < openings.Count; i++) arr[i] = openings[i];
         return arr;
+    }
+
+    /// <summary>Marker tint: first point green, last point red (Path3D's direction cue), the rest neutral.</summary>
+    private static Color PointMarkerColor(int i, int count)
+    {
+        if (i == 0) return new Color(0.4f, 1.0f, 0.45f);
+        if (i == count - 1) return new Color(1.0f, 0.4f, 0.35f);
+        return new Color(0.85f, 0.85f, 0.9f);
     }
 
     /// <summary>A horizontal unit vector perpendicular to the path's local direction at point <paramref name="i"/>

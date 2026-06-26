@@ -23,6 +23,38 @@ public static class GizmoMath
         return true;
     }
 
+    /// <summary>
+    /// Closest point on the segment a→b to the ray {from + s·dir, s≥0}. <paramref name="dir"/> must be
+    /// unit length. Returns the segment point, its parameter <paramref name="segT"/> ∈ [0,1], and the 3D
+    /// distance between the segment and the ray (how close the cursor came to the line). Standard
+    /// two-segment closest-point, with the ray clamped to s≥0 and the segment to t∈[0,1].
+    /// </summary>
+    public static void ClosestRaySegment(Vector3 from, Vector3 dir, Vector3 a, Vector3 b,
+        out Vector3 segPoint, out float segT, out float dist)
+    {
+        Vector3 d2 = b - a;
+        Vector3 r = from - a;
+        float e = d2.Dot(d2);
+        float c = dir.Dot(r);
+        if (e < 1e-9f) // degenerate segment: treat as the point a
+        {
+            segT = 0f;
+            segPoint = a;
+            dist = (from + dir * Mathf.Max(0f, -c)).DistanceTo(a);
+            return;
+        }
+        float f = d2.Dot(r);
+        float bb = dir.Dot(d2);
+        float denom = e - bb * bb;            // a·e − b² with a = dir·dir = 1
+        float s = Mathf.Abs(denom) > 1e-9f ? Mathf.Max(0f, (bb * f - c * e) / denom) : 0f;
+        float t = (bb * s + f) / e;
+        if (t < 0f) { t = 0f; s = Mathf.Max(0f, -c); }
+        else if (t > 1f) { t = 1f; s = Mathf.Max(0f, bb - c); }
+        segT = t;
+        segPoint = a + d2 * t;
+        dist = segPoint.DistanceTo(from + dir * s);
+    }
+
     /// <summary>Intersection of the ray {from + t·dir} with the plane through
     /// <paramref name="planePoint"/> with the given <paramref name="planeNormal"/>. False if
     /// parallel or behind the camera.</summary>

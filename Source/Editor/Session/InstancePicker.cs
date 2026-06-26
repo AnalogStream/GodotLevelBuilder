@@ -54,6 +54,16 @@ public partial class InstancePicker : Node3D
     /// <summary>Current mouse position in viewport pixels (for screen-space drag thresholds).</summary>
     public Vector2 MouseScreen() => GetViewport().GetMousePosition();
 
+    /// <summary>Projects a world point to viewport pixels. False if there's no camera or the point is behind it.</summary>
+    public bool WorldToScreen(Vector3 world, out Vector2 screen)
+    {
+        screen = Vector2.Zero;
+        Camera3D cam = GetViewport().GetCamera3D();
+        if (cam == null || cam.IsPositionBehind(world)) return false;
+        screen = cam.UnprojectPosition(world);
+        return true;
+    }
+
     /// <summary>The current mouse ray (world origin + normalized direction); false if no camera.</summary>
     public bool MouseRay(out Vector3 from, out Vector3 dir)
     {

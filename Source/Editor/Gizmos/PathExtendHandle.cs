@@ -10,8 +10,8 @@ namespace LevelBuilder.Editor.Gizmos;
 /// Extends an OPEN path_sweep past one of its endpoints — the affordance for growing a path after it's
 /// drawn. One at the first point, one at the last; each sits a cell beyond the endpoint along the path's
 /// outgoing tangent. Dragging (X/Z plane, grid-snapped) adds a new control point there (prepended at the
-/// start, appended at the end) and moves it. Like <see cref="PathInsertHandle"/> a plain click does
-/// nothing — the point is only added once the drag begins, so <see cref="Changed"/> stays false. Closed
+/// start, appended at the end) and moves it. A plain click does nothing — the point is only added once
+/// the drag begins, so <see cref="Changed"/> stays false (mid-path adds are a click on the overlay line). Closed
 /// paths get none (a loop has no ends; use the per-segment insert handles instead). One
 /// <see cref="EditPathCommand"/> per add.
 /// </summary>

@@ -52,6 +52,7 @@ public partial class Main : Node3D
         var cameraRig = new EditorCameraRig();
         var picker = new InstancePicker();
         var gizmos = new GizmoLayer { Name = "GizmoLayer" };
+        var pathOverlay = new PathOverlay { Name = "PathOverlay" };
         var tools = new ToolManager();
 
         // The 3D world renders into a SubViewport (its own World3D + physics space), so the
@@ -61,6 +62,7 @@ public partial class Main : Node3D
         viewport.AddChild(levelView);
         viewport.AddChild(previewLayer);
         viewport.AddChild(gizmos);
+        viewport.AddChild(pathOverlay);
         viewport.AddChild(cursor);     // before ToolManager so HoveredCell/Corner is fresh each frame
         viewport.AddChild(cameraRig);
         viewport.AddChild(picker);
@@ -138,6 +140,7 @@ public partial class Main : Node3D
             PreviewLayer = previewLayer,
             Picker = picker,
             Gizmos = gizmos,
+            PathOverlay = pathOverlay,
             Config = config,
         };
         _ctx = ctx;

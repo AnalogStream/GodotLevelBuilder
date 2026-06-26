@@ -39,12 +39,22 @@ public sealed class SelectTool : ITool
 
         if (r.IsHandle)
         {
-            // Resize: grab a gizmo handle without changing the selection.
-            if (r.HandleIndex < _ctx.Handles.Count) Begin(_ctx.Handles[r.HandleIndex]);
+            if (r.HandleIndex < _ctx.Handles.Count)
+            {
+                IEditHandle h = _ctx.Handles[r.HandleIndex];
+                // A path-point marker selects that point (view state) rather than starting a drag.
+                if (h is IPathPointSelect ps) { _ctx.SelectPathPoint(ps.Index); return; }
+                Begin(h); // Resize/move: grab the gizmo handle without changing the selection.
+            }
             return;
         }
 
         bool ctrl = Input.IsKeyPressed(Key.Ctrl);
+
+        // Path3D-style add-point: a plain click near the selected path's line inserts a point there. Runs
+        // before the body/empty handling (and works over the swept mesh) so the curve line takes priority;
+        // it's a cheap no-op false unless a single path_sweep is selected and the click is on the line.
+        if (!ctrl && _ctx.TryInsertPathPointAtCursor()) return;
 
         if (!r.Hit) { if (!ctrl) _ctx.ClearSelection(); return; } // Ctrl+click on empty keeps the current set
 
