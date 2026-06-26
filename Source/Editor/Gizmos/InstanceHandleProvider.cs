@@ -43,6 +43,12 @@ public static class InstanceHandleProvider
                 int segCount = pathClosed ? pts.Count : pts.Count - 1;
                 for (int i = 0; i < segCount; i++)
                     handles.Add(new PathInsertHandle(inst, i, off, grid.CellSize));
+                // Open paths can also grow past either end (drag a new point off the first/last point).
+                if (!pathClosed && pts.Count >= 2)
+                {
+                    handles.Add(new PathExtendHandle(inst, atStart: true, off, grid.CellSize));
+                    handles.Add(new PathExtendHandle(inst, atStart: false, off, grid.CellSize));
+                }
                 break;
             }
             case "floor":
