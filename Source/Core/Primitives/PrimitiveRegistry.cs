@@ -20,6 +20,7 @@ public sealed class PrimitiveRegistry
     {
         var registry = new PrimitiveRegistry();
         registry.Register(new FloorPrimitive());
+        registry.Register(new PolygonFloorPrimitive());
         registry.Register(new WallPrimitive());
         registry.Register(new RampPrimitive());
         registry.Register(new StairsPrimitive());

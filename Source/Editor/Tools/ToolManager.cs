@@ -33,6 +33,7 @@ public partial class ToolManager : Node
         _ctx = ctx;
 
         var floor = new FloorDrawTool();
+        var polygonFloor = new PolygonFloorDrawTool();
         var wall = new WallDrawTool();
         var ramp = new RampDrawTool();
         var stairs = new StairsDrawTool();
@@ -52,6 +53,7 @@ public partial class ToolManager : Node
         {
             { Key.S, new SelectTool() },
             { Key.F, floor },
+            { Key.Y, polygonFloor },
             { Key.W, wall },
             { Key.D, door },
             { Key.N, window },
@@ -71,6 +73,7 @@ public partial class ToolManager : Node
         _toolsById = new Dictionary<string, ITool>
         {
             { "floor", floor },
+            { "polygon_floor", polygonFloor },
             { "wall", wall },
             { "ramp", ramp },
             { "stairs", stairs },
@@ -94,7 +97,7 @@ public partial class ToolManager : Node
             if (_idByTool.TryGetValue(tool, out string id))
                 _hotkeyById[id] = key.ToString();
 
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points; click last point again to finish, or first point to close a loop), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, Y = polYgon floor (click corners; click first corner again to close), W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points; click last point again to finish, or first point to close a loop), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Cancels any in-progress tool operation (e.g. a half-drawn primitive) before a
