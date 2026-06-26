@@ -267,6 +267,20 @@ public sealed class EditorContext
         Commands.Execute(new AddInstanceCommand(Document, _drawHeight, Document.DefaultStoreyHeight, instance, Refresh));
     }
 
+    /// <summary>Sets (or clears) the hole ring of a polygon floor (undoable). <paramref name="hole"/> with
+    /// &lt;3 points clears it. No-op if the instance is gone or isn't a polygon floor. Called by the cut-hole tool.</summary>
+    public void SetPolygonHole(string instanceId, Godot.Collections.Array<Vector3> hole)
+    {
+        PrimitiveInstanceData inst = GetInstance(instanceId);
+        if (inst == null || inst.PrimitiveType != "polygon_floor") return;
+
+        var from = new Godot.Collections.Array<Vector3>();
+        if (inst.Parameters.ContainsKey("hole"))
+            foreach (Variant v in inst.Parameters["hole"].AsGodotArray()) from.Add(v.AsVector3());
+
+        Commands.Execute(new SetHoleCommand(inst, from, hole, Refresh));
+    }
+
     /// <summary>
     /// Paints every material slot of an instance with <paramref name="texturePath"/> (undoable).
     /// Ensures the texture exists in the level's material library first. No-op if the instance is gone.

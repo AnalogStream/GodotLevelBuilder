@@ -34,6 +34,7 @@ public partial class ToolManager : Node
 
         var floor = new FloorDrawTool();
         var polygonFloor = new PolygonFloorDrawTool();
+        var cutHole = new CutHoleTool();
         var wall = new WallDrawTool();
         var ramp = new RampDrawTool();
         var stairs = new StairsDrawTool();
@@ -54,6 +55,7 @@ public partial class ToolManager : Node
             { Key.S, new SelectTool() },
             { Key.F, floor },
             { Key.Y, polygonFloor },
+            { Key.K, cutHole },
             { Key.W, wall },
             { Key.D, door },
             { Key.N, window },
@@ -74,6 +76,7 @@ public partial class ToolManager : Node
         {
             { "floor", floor },
             { "polygon_floor", polygonFloor },
+            { "cut_hole", cutHole },
             { "wall", wall },
             { "ramp", ramp },
             { "stairs", stairs },
@@ -97,7 +100,7 @@ public partial class ToolManager : Node
             if (_idByTool.TryGetValue(tool, out string id))
                 _hotkeyById[id] = key.ToString();
 
-        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, Y = polYgon floor (click corners; click first corner again to close), W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points; click last point again to finish, or first point to close a loop), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
+        GD.Print("[tools] S = Select (click door/window to select, drag to move it along the wall), F = Floor, Y = polYgon floor (click corners; click first corner again to close), K = cut hole (in selected polygon floor), W = Wall, R = Ramp, T = sTairs, G = ramp plane (Gradient), H = stair plane, C = banked Curve, U = half-pipe (U-channel), E = Edge curb, L = cyLinder, A = Arc wall (curved), O = dome/bOwl, P = Path sweep (click points; click last point again to finish, or first point to close a loop), D = Door, N = wiNdow, +/- = storey up/down, Del = delete, Esc/RMB = cancel, Ctrl+Z/Y = undo/redo, Ctrl+B = bake, Ctrl+S = save");
     }
 
     /// <summary>Cancels any in-progress tool operation (e.g. a half-drawn primitive) before a
@@ -173,7 +176,9 @@ public partial class ToolManager : Node
     private void SetActive(ITool tool)
     {
         _active?.Deactivate();
-        _ctx.ClearSelection();
+        // Most tools start from a clean slate; a selection-preserving tool (cut-hole) operates ON the
+        // current selection, so keep it.
+        if (tool is not IPreservesSelection) _ctx.ClearSelection();
         _active = tool;
         _ctx.Cursor.Enabled = tool.UsesGridCursor;
         tool.Activate(_ctx);
