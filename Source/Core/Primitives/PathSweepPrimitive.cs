@@ -17,6 +17,8 @@ namespace LevelBuilder.Core.Primitives;
 /// The cross-section is one of three <c>profile</c>s, each a closed 2D loop (frame coords: X = lateral,
 /// Y = up) with a per-edge material slot, swept as quad strips + triangulated end caps:
 ///   0 Ribbon  — a flat slab you roll on (top = Surface, sides/bottom = Side); bank it for a banked road.
+///               Optional edge rails (the "rail" param) fold a curb or angled-bank lip down each long edge
+///               into the swept loop on a trailing Rail slot, so the rails inherit the framing/banking/caps.
 ///   1 Channel — a U-shell half-pipe (concave inside = Surface, outer shell + rims = Side).
 ///   2 Wall    — a thin upright wall / guard rail (vertical faces = Surface, top/bottom = Side).
 ///   3 Tube    — a full circular pipe, ball rolls inside (inner bore = Surface, outer shell = Side); for
@@ -49,9 +51,22 @@ public sealed class PathSweepPrimitive : IPrimitive
         new ParamSpec("sides",      "Sides",       ParamType.Int,   12,    2f,   64f),
         new ParamSpec("segments",   "Segments",    ParamType.Int,   8,     1f,   64f),
         new ParamSpec("closed",     "Closed Loop", ParamType.Bool,  false),
+        // Edge rails — RIBBON profile only (the other profiles are already enclosed). None = bare slab;
+        // Rail = a vertical curb/lip down each long edge; Bank = an angled wedge down each edge. The rolling
+        // lane runs between the two rails. These feed a TRAILING, CONDITIONAL "Rail" surface/slot: surface 2
+        // exists only when a rail is built, so the positional Surface/Side mapping is undisturbed otherwise.
+        new ParamSpec("rail",          "Edge Rail",       ParamType.Int,   0, 0f, 2f, new[] { "None", "Rail", "Bank" }),
+        new ParamSpec("railHeight",    "Rail Height",     ParamType.Float, 0.3f, 0.02f, 50f),
+        new ParamSpec("railWidth",     "Rail Width",      ParamType.Float, 0.3f, 0.02f, 50f),
+        // Bank wedge angle from horizontal (degrees): the wedge drops railHeight over a run of
+        // height/tan(|angle|). SIGN sets the lean — positive = high lip at the OUTER edge sloping inward
+        // (funnels toward the lane); negative = high lip at the INNER edge sloping back out. Ignored unless Bank.
+        new ParamSpec("railBankAngle", "Rail Bank Angle", ParamType.Float, 45f, -85f, 85f),
     };
 
-    public IReadOnlyList<string> MaterialSlots { get; } = new[] { "Surface", "Side" };
+    // "Rail" is a TRAILING, CONDITIONAL slot (committed only for a railed Ribbon), so its absence leaves the
+    // Surface/Side mapping intact for every other profile — same positional-slot convention as the baker.
+    public IReadOnlyList<string> MaterialSlots { get; } = new[] { "Surface", "Side", "Rail" };
 
     public ArrayMesh BuildMesh(PrimitiveInstanceData data, BuildContext ctx)
     {
@@ -139,7 +154,10 @@ public sealed class PathSweepPrimitive : IPrimitive
             U[i] = U[i].Rotated(T[i], a);
         }
 
-        SurfaceTool surface = Begin(), side = Begin();
+        int railStyle = GetI(data, "rail", 0);
+        bool hasRail = profile == Ribbon && railStyle != 0; // rails only on the open Ribbon profile
+
+        SurfaceTool surface = Begin(), side = Begin(), rail = Begin();
         if (profile == Tube)
         {
             // A full pipe is two concentric rings, not a simple loop (an annulus can't be one
@@ -148,19 +166,24 @@ public sealed class PathSweepPrimitive : IPrimitive
         }
         else
         {
-            // --- Cross-section loop + per-edge slot for the chosen profile. ---
+            // --- Cross-section loop + per-edge slot for the chosen profile. A railed Ribbon folds its curb /
+            // bank lips straight into the swept loop (slot 2 = Rail), so they inherit the framing/banking/caps. ---
             (Vector2[] loop, int[] slot) = profile switch
             {
                 Channel => ChannelLoop(radius, t, arc, sides),
                 Wall    => WallLoop(t, wallH),
+                _ when hasRail => RibbonRailLoop(width, t, railStyle,
+                                      GetF(data, "railHeight", 0.3f), GetF(data, "railWidth", 0.3f),
+                                      GetF(data, "railBankAngle", 45f)),
                 _       => RibbonLoop(width, t),
             };
-            Sweep(surface, side, pos, R, U, T, dist, loop, slot, closed);
+            Sweep(surface, side, rail, pos, R, U, T, dist, loop, slot, closed);
         }
 
         var mesh = new ArrayMesh();
         Commit(surface, mesh);
         Commit(side, mesh);
+        if (hasRail) Commit(rail, mesh); // trailing Rail surface — only when rail geometry was emitted
         return mesh;
     }
 
@@ -179,6 +202,43 @@ public sealed class PathSweepPrimitive : IPrimitive
         float h = w * 0.5f;
         var loop = new[] { new Vector2(-h, 0), new Vector2(h, 0), new Vector2(h, -t), new Vector2(-h, -t) };
         return (loop, new[] { 0, 1, 1, 1 }); // top = Surface, right/bottom/left = Side
+    }
+
+    /// <summary>The Ribbon cross-section with an edge rail folded in (slot 2 = Rail): the rolling top (slot 0)
+    /// runs between a curb / bank lip down each long edge, the outer sides + bottom stay Side (slot 1). The
+    /// rail width is clamped to leave a rolling lane between the two lips. Style 1 = vertical curb (rise rh,
+    /// width rw); style 2 = angled Bank — the wedge drops rh over a run of rh/tan(|angle|), and the angle's
+    /// SIGN leans it: positive puts the high lip on the OUTER edge (slopes inward toward the lane), negative on
+    /// the INNER edge (slopes back out). Both wind exterior-on-left like <see cref="RibbonLoop"/>.</summary>
+    private static (Vector2[], int[]) RibbonRailLoop(float w, float t, int style, float rh, float rw, float bankAngleDeg)
+    {
+        float h = w * 0.5f;
+        if (style == 2) // Bank: angled wedge, run derived from the angle, sign leans it.
+        {
+            bool flip = bankAngleDeg < 0f;
+            float mag = Mathf.Clamp(Mathf.Abs(bankAngleDeg), 5f, 85f);
+            float run = Mathf.Min(rh / Mathf.Tan(Mathf.DegToRad(mag)), 0.45f * w);
+            Vector2[] bank = flip
+                // High lip at the INNER edge, slope back out to the ribbon edge.
+                ? new[] { new Vector2(-h, 0), new Vector2(-h + run, rh), new Vector2(-h + run, 0),
+                          new Vector2(h - run, 0), new Vector2(h - run, rh), new Vector2(h, 0),
+                          new Vector2(h, -t), new Vector2(-h, -t) }
+                // High lip at the OUTER edge, slope inward toward the lane.
+                : new[] { new Vector2(-h, 0), new Vector2(-h, rh), new Vector2(-h + run, 0),
+                          new Vector2(h - run, 0), new Vector2(h, rh), new Vector2(h, 0),
+                          new Vector2(h, -t), new Vector2(-h, -t) };
+            return (bank, new[] { 2, 2, 0, 2, 2, 1, 1, 1 });
+        }
+
+        // Style 1: vertical curb down each edge — outer wall, top band, inner wall.
+        rw = Mathf.Min(rw, 0.45f * w);
+        var curb = new[]
+        {
+            new Vector2(-h, 0),      new Vector2(-h, rh),      new Vector2(-h + rw, rh), new Vector2(-h + rw, 0),
+            new Vector2(h - rw, 0),  new Vector2(h - rw, rh),  new Vector2(h, rh),       new Vector2(h, 0),
+            new Vector2(h, -t),      new Vector2(-h, -t),
+        };
+        return (curb, new[] { 2, 2, 2, 0, 2, 2, 2, 1, 1, 1 });
     }
 
     private static (Vector2[], int[]) WallLoop(float t, float h)
@@ -213,7 +273,7 @@ public sealed class PathSweepPrimitive : IPrimitive
 
     // --- Sweep the closed loop along the stations: one quad strip per edge + triangulated end caps. ---
 
-    private static void Sweep(SurfaceTool surface, SurfaceTool side, Vector3[] pos, Vector3[] R, Vector3[] U,
+    private static void Sweep(SurfaceTool surface, SurfaceTool side, SurfaceTool rail, Vector3[] pos, Vector3[] R, Vector3[] U,
         Vector3[] T, float[] dist, Vector2[] loop, int[] slot, bool closed)
     {
         int stations = pos.Length - 1;
@@ -231,7 +291,7 @@ public sealed class PathSweepPrimitive : IPrimitive
             var ln = new Vector2(-d.Y, d.X);
             if (ln.LengthSquared() < 1e-12f) continue; // degenerate edge (e.g. a closed-tube rim)
             ln = ln.Normalized();
-            SurfaceTool st = slot[e] == 0 ? surface : side;
+            SurfaceTool st = slot[e] switch { 0 => surface, 2 => rail, _ => side };
             float vE = perim[e], vF = perim[e + 1];
             for (int i = 0; i < stations; i++)
             {
