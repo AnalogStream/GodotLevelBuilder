@@ -169,5 +169,6 @@ check — the real gate is opening the exported `.tscn` in the target project an
 render**. The baked tree references only built-in Godot node types, so it opens without the builder's
 C#.
 
-The two local **Bake** buttons (per-object → `res://Baked/<Name>.tscn`, merged →
-`<Name>_merged.tscn`) are unchanged in-project previews and do **not** embed.
+The two local **Bake** buttons (per-object → `<workspace>/baked/<Name>.tscn`, merged →
+`<Name>_merged.tscn`) are local previews and do **not** embed. They write into the workspace folder
+(writable) rather than `res://` (read-only in a standalone build), and require a workspace to be set.

@@ -160,8 +160,8 @@ Document-level actions, all routed through `EditorContext`/`AppConfig` (same pat
 - **Level** — a name `LineEdit` (the only focus-taking widget here; it edits `Document.Name`, which
   is metadata, not undo-tracked) + **New** / **Open…** / **Save**. Open is a `FileDialog{OpenFile,
   *.tres}` rooted at `<workspace>/levels`; Save writes there and remembers the path for resume.
-- **Bake (local preview)** — per-object and merged-chunk bakes into `res://Baked` (in-project, no
-  embed). See `EXPORT.md`.
+- **Bake (local preview)** — per-object and merged-chunk bakes into `<workspace>/baked` (no embed;
+  needs a workspace set). See `EXPORT.md`.
 - **Export to game** — target label + "Set…" (`FileDialog{OpenDir}`) + **Export to Game** (disabled
   until a target is set). Writes a merged chunk with inline-embedded textures into
   `<target>/levels/<Name>.tscn`. See `EXPORT.md`.

@@ -169,13 +169,14 @@ Create, open, and save the editable source `.tres`:
 
 #### Bake (local preview)
 
-Bakes a `.tscn` into this app's own project at `res://Baked/` — for previewing the result here,
-**not** for shipping. Two modes:
+Bakes a `.tscn` into the workspace's `baked/` folder — for previewing the result, **not** for
+shipping. (Earlier versions wrote to `res://Baked/`, which fails in a standalone build because
+`res://` is read-only; the workspace folder is always writable.) Two modes:
 
 - **Bake (per-object)** — one node per primitive instance; keeps per-object material overrides.
-  Writes `res://Baked/<Name>.tscn` (also `Ctrl+B`).
+  Writes `<workspace>/baked/<Name>.tscn` (also `Ctrl+B`).
 - **Bake Merged Chunk** — one merged mesh per material + one precise trimesh collision; per-object
-  overrides collapse to per-material. Writes `res://Baked/<Name>_merged.tscn`.
+  overrides collapse to per-material. Writes `<workspace>/baked/<Name>_merged.tscn`.
 
 #### Export to game
 

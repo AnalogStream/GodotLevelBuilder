@@ -20,6 +20,9 @@ public static class Workspace
     public static bool IsSet => !string.IsNullOrEmpty(Root);
     public static string LevelsDir => IsSet ? $"{Root}/levels" : "";
     public static string TexturesDir => IsSet ? $"{Root}/textures" : "";
+    /// <summary>Where the local "bake" buttons drop game-ready .tscn output. Writable (unlike
+    /// <c>res://</c>, which is read-only once the builder is an exported standalone binary).</summary>
+    public static string BakedDir => IsSet ? $"{Root}/baked" : "";
 
     /// <summary>Sets the workspace root (normalising slashes) and creates its subfolders.</summary>
     public static void SetRoot(string absPath)

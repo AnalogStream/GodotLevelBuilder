@@ -666,8 +666,6 @@ public sealed class EditorContext
         return (null, null, -1);
     }
 
-    private const string BakedDir = "res://Baked";
-
     // ---- document lifecycle (New / Open / Save) --------------------------
 
     /// <summary>
@@ -745,11 +743,13 @@ public sealed class EditorContext
         Config.Save();
     }
 
-    /// <summary>Bakes a game-ready .tscn (meshes + collision) you can open in Godot.</summary>
+    /// <summary>Bakes a game-ready .tscn (meshes + collision) you can open in Godot. Writes into the
+    /// workspace's <c>baked/</c> folder (writable; <c>res://</c> is read-only in a standalone build).</summary>
     public void BakeToGodot()
     {
-        EnsureDir(BakedDir);
-        string path = $"{BakedDir}/{FileStem()}.tscn";
+        if (!RequireWorkspaceForBake()) return;
+        EnsureDir(Workspace.BakedDir);
+        string path = $"{Workspace.BakedDir}/{FileStem()}.tscn";
         Error e = new SceneBaker(Registry).BakeToFile(Document, path);
         Report("bake", path, e);
     }
@@ -759,10 +759,21 @@ public sealed class EditorContext
     /// chunks. Separate output (<c>_merged.tscn</c>) — does not overwrite the per-instance bake.</summary>
     public void BakeMergedToGodot()
     {
-        EnsureDir(BakedDir);
-        string path = $"{BakedDir}/{FileStem()}_merged.tscn";
+        if (!RequireWorkspaceForBake()) return;
+        EnsureDir(Workspace.BakedDir);
+        string path = $"{Workspace.BakedDir}/{FileStem()}_merged.tscn";
         Error e = new SceneBaker(Registry).BakeMergedToFile(Document, path);
         Report("bake merged", path, e);
+    }
+
+    /// <summary>Bake targets the workspace folder (the only reliably writable location). Warns and
+    /// returns false when no workspace is set, mirroring <see cref="SaveSource"/>.</summary>
+    private bool RequireWorkspaceForBake()
+    {
+        if (Workspace.IsSet) return true;
+        GD.PushWarning("[bake] no workspace set — pick a workspace folder first (Project tab).");
+        Notified?.Invoke(NotifyLevel.Warning, "No workspace set — pick a folder in the Project tab first.");
+        return false;
     }
 
     /// <summary>
