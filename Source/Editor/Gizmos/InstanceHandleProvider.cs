@@ -103,6 +103,26 @@ public static class InstanceHandleProvider
                 }
                 break;
             }
+            case "circle_plane":
+            {
+                float cr = GetF(inst, "radius", 2f), ct = GetF(inst, "thickness", 0.2f);
+                // Radius grows from the fixed axis (origin) on the +X and +Z rim; thickness grows down from the
+                // fixed top surface (y=0).
+                AddFace(handles, inst, prim, world, "radius", new Vector3(cr, 0, 0), new Vector3(1, 0, 0), 0f);
+                AddFace(handles, inst, prim, world, "radius", new Vector3(0, 0, cr), new Vector3(0, 0, 1), 0f);
+                AddFace(handles, inst, prim, world, "thickness", new Vector3(0, -ct, 0), new Vector3(0, -1, 0), 0f);
+                break;
+            }
+            case "half_circle":
+            {
+                float hr = GetF(inst, "radius", 2f), ht = GetF(inst, "thickness", 0.2f);
+                // Radius on the arc (local +Z bulge) and on both diameter ends (±X); thickness grows down.
+                AddFace(handles, inst, prim, world, "radius", new Vector3(0, 0, hr), new Vector3(0, 0, 1), 0f);
+                AddFace(handles, inst, prim, world, "radius", new Vector3(hr, 0, 0), new Vector3(1, 0, 0), 0f);
+                AddFace(handles, inst, prim, world, "radius", new Vector3(-hr, 0, 0), new Vector3(-1, 0, 0), 0f);
+                AddFace(handles, inst, prim, world, "thickness", new Vector3(0, -ht, 0), new Vector3(0, -1, 0), 0f);
+                break;
+            }
             case "floor":
             {
                 float w = GetF(inst, "width", 4f), d = GetF(inst, "depth", 4f), t = GetF(inst, "thickness", 0.2f);

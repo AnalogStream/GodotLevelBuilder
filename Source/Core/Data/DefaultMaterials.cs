@@ -27,6 +27,8 @@ public static class DefaultMaterials
     {
         "floor" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim },
         "polygon_floor" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim, ["Rail"] = Wall },
+        "circle_plane" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim, ["Rail"] = Wall },
+        "half_circle" => new Dictionary<string, string> { ["Top"] = Floor, ["Bottom"] = Trim, ["Edge"] = Trim, ["Rail"] = Wall },
         "wall" => new Dictionary<string, string>
         {
             ["Front"] = Wall, ["Back"] = Wall, ["Top"] = Trim, ["Ends"] = Trim, ["Reveal"] = Trim,
