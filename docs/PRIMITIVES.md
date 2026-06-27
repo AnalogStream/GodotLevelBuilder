@@ -99,7 +99,7 @@ wall, placed via `OpeningTool` (see below).
 | `wall` | Structure | `W` | length, height, thickness (+ openings) | Front, Back, Top, Ends, Reveal |
 | `curved_wall` | Structure | `A` | radius, arc, height, thickness, segments | Front, Back, Top, Ends |
 | `cylinder` | Structure | `L` | radius, height, sides | Side, Top, Bottom |
-| `edge_curb` | Structure | `E` | width, depth, railHeight, thickness | Side, Top, Bottom |
+| `edge_curb` | Structure | `E` | width, depth, style (Rail/Elevated Rail/Bank), railHeight, thickness, bankAngle | Side, Top, Bottom |
 | `ramp` | Vertical | `R` | length, rise, width | Surface, Side |
 | `ramp_plane` | Vertical | `G` | length, rise, width, thickness | Surface, Side |
 | `stairs` | Vertical | `T` | steps, totalRise, run, width | Tread, Riser, Side |
