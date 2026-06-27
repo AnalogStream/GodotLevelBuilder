@@ -13,6 +13,10 @@ public partial class HelpOverlay : Control
     {
         ("S", "Select / move (Ctrl+click multi-select)"),
         ("F", "Floor"),
+        ("Y", "Polygon floor"),
+        ("I", "Circle plane"),
+        ("J", "Half circle"),
+        ("K", "Cut hole (in selected polygon floor)"),
         ("W", "Wall"),
         ("D", "Door opening"),
         ("N", "Window opening"),
@@ -26,6 +30,7 @@ public partial class HelpOverlay : Control
         ("L", "Cylinder"),
         ("A", "Curved (arc) wall"),
         ("O", "Dome / bowl"),
+        ("P", "Path sweep"),
     };
 
     private static readonly (string Keys, string Action)[] Commands =

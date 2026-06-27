@@ -9,6 +9,7 @@ namespace LevelBuilder.Editor.Camera;
 ///   • Mouse wheel              → zoom (dolly toward/away from focus)
 ///   • Press 7                  → toggle orthographic top-down view (Blender numpad-7),
 ///                                 looking straight down for laying out the floor plan
+///                                 (start orbiting to drop back out of it, like Blender)
 ///
 /// This node IS the focus pivot: its Position is the look-at target, its rotation
 /// is the orbit, and the child Camera3D sits back along local +Z at <see cref="Distance"/>.
@@ -78,6 +79,17 @@ public partial class EditorCameraRig : Node3D
         Apply();
     }
 
+    /// <summary>Leaves the orthographic top-down lock into a free perspective orbit, keeping the current
+    /// (straight-down) heading rather than restoring the pre-top-down viewpoint — so an orbit drag tilts
+    /// out of the floor-plan view from where you're looking. Pitch is pulled inside the orbit clamp so the
+    /// first drag tilts smoothly instead of snapping off the −90° edge.</summary>
+    private void ExitTopDownIntoOrbit()
+    {
+        _topDown = false;
+        _pitch = Mathf.Clamp(_pitch, Mathf.DegToRad(-89f), Mathf.DegToRad(89f));
+        Apply();
+    }
+
     private void HandleButton(InputEventMouseButton mb)
     {
         switch (mb.ButtonIndex)
@@ -91,6 +103,9 @@ public partial class EditorCameraRig : Node3D
             case MouseButton.Middle:
                 _panning = mb.Pressed && mb.ShiftPressed;
                 _orbiting = mb.Pressed && !mb.ShiftPressed;
+                // Blender numpad-7 behaviour: orbiting drops you out of the top-down lock and keeps
+                // turning from the current straight-down orientation (panning stays in top-down).
+                if (_orbiting && _topDown) ExitTopDownIntoOrbit();
                 break;
         }
     }

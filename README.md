@@ -1,7 +1,7 @@
 # LevelBuilder
 
 A standalone **Godot 4.7 / C#** application for designing game levels out of parametric
-primitives — floors, walls, ramps, stairs, curves, domes, doors and windows — on a snapping
+primitives — floors, discs, walls, ramps, stairs, curves, domes, doors and windows — on a snapping
 3D grid, then **baking** them into a `.tscn` you drop straight into another Godot game.
 
 Geometry is **procedural `ArrayMesh`** (no live CSG). Each primitive type generates its own
@@ -34,8 +34,8 @@ The word "level" is overloaded, so the project uses these names:
 
 ## Features
 
-- **14 parametric primitives**, grouped by category:
-  - **Structure** — Floor, Polygon Floor, Wall, Curved Wall, Cylinder, Edge Curb
+- **16 parametric primitives**, grouped by category:
+  - **Structure** — Floor, Polygon Floor, Circle Plane, Half Circle, Wall, Curved Wall, Cylinder, Edge Curb
   - **Vertical** — Ramp, Stairs, Ramp Plane, Stair Plane
   - **Curves** — Banked Curve, Half-Pipe, Path Sweep, Dome / Bowl
 - **Openings** — doors and windows as selectable, movable, resizable objects. The wall mesh and
@@ -43,11 +43,15 @@ The word "level" is overloaded, so the project uses these names:
   on deselect and on bake/save.
 - **Polygon floors with holes** — draw a slab with an arbitrary outline (angled rhombus, freeform
   playfield), edit corners as gizmos, and cut one or more **holes** the ball falls through.
+- **Circle & half-circle planes** — round and half-round flat slabs (drag from centre to set the
+  radius; the half circle's flat side faces the way you drag) that carry the same rim auto-rails as
+  the polygon floor. The half circle can also rail its straight (diameter) edge independently.
 - **Path Sweep** — sweep a cross-section (ribbon, channel, wall, or tube) along a freeform 3D
   spline, with per-point height and bank, end-to-end editing handles, and **closed loops** for
   circuits and loop-the-loops.
-- **Auto-rails** — give a **Polygon Floor** or a **Path Sweep** ribbon edge rails with no extra
-  modeling. Polygon floors rail the outer outline *and* each hole independently
+- **Auto-rails** — give a **Polygon Floor**, **Circle Plane**, **Half Circle**, or a **Path Sweep**
+  ribbon edge rails with no extra modeling. Polygon floors rail the outer outline *and* each hole
+  independently; circles rail the rim; half circles rail the arc and (optionally) the straight edge
   (**None / Rail (curb) / Elevated Rail (fence) / Bank**); ribbons rail both long edges
   (**Rail / Bank**). Height, width, and a **signed bank angle** (leans inward or outward) are
   adjustable per rail.
@@ -122,6 +126,7 @@ right **inspector**, and a bottom tab bar with **Primitives / Textures / Project
 | `L` | Cylinder | `A` | Curved Wall |
 | `O` | Dome / Bowl | `P` | Path Sweep |
 | `Y` | Polygon Floor | `K` | Cut Hole (in selected polygon floor) |
+| `I` | Circle Plane | `J` | Half Circle |
 
 **Actions:**
 
@@ -196,7 +201,7 @@ Source/
   App/            bootstrap; Main.cs builds the entire editor UI in code
   Core/
     Data/         LevelDocument, StoreyData, PrimitiveInstanceData, MaterialLibrary (Resources)
-    Primitives/   IPrimitive, PrimitiveRegistry + the 14 primitive types
+    Primitives/   IPrimitive, PrimitiveRegistry + the 16 primitive types
     Geometry/     SurfaceTool/ArrayMesh helpers, wall box-decomposition
     Grid/         grid model + snapping
     Build/        SceneBaker (.tscn), MaterialResolver, save/load (.tres)
